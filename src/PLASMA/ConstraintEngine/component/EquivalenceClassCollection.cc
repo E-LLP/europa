@@ -3,8 +3,8 @@
 
 namespace EUROPA{
 
-  ConstraintNode::ConstraintNode(const ConstrainedVariableId& variable)
-    : m_variable(variable), m_graph(0), m_lastUpdated(0){}
+ConstraintNode::ConstraintNode(const ConstrainedVariableId variable)
+    : m_variable(variable), m_graph(0), m_lastUpdated(0), m_neighbours(){}
 
   bool ConstraintNode::hasBeenUpdated(int nextCycle) const {
     check_error(nextCycle >= m_lastUpdated);
@@ -29,12 +29,12 @@ namespace EUROPA{
 	 (*it)->update(nextCycle, connectedVariables, graph, oldGraphKeys);
   }
 
-  void ConstraintNode::addNeighbour(const ConstraintNodeId& node){
+  void ConstraintNode::addNeighbour(const ConstraintNodeId node){
     check_error(m_neighbours.find(node) == m_neighbours.end());
     m_neighbours.insert(node);
   }
 
-  void ConstraintNode::removeNeighbour(const ConstraintNodeId& node){
+  void ConstraintNode::removeNeighbour(const ConstraintNodeId node){
     check_error(m_neighbours.find(node) != m_neighbours.end());
     m_neighbours.erase(node);
   }
@@ -47,7 +47,7 @@ namespace EUROPA{
       it->second.release();
   }
 
-  void EquivalenceClassCollection::addConnection(const ConstrainedVariableId& v1, const ConstrainedVariableId& v2){
+  void EquivalenceClassCollection::addConnection(const ConstrainedVariableId v1, const ConstrainedVariableId v2){
     const ConstraintNodeId n1 = getNode(v1);
     const ConstraintNodeId n2 = getNode(v2);
     n1->addNeighbour(n2);
@@ -58,7 +58,7 @@ namespace EUROPA{
     }
   }
 
-  void EquivalenceClassCollection::removeConnection(const ConstrainedVariableId& v1, const ConstrainedVariableId& v2){
+  void EquivalenceClassCollection::removeConnection(const ConstrainedVariableId v1, const ConstrainedVariableId v2){
     ConstraintNodeId n1 = getNode(v1);
     ConstraintNodeId n2 = getNode(v2);
 
@@ -82,14 +82,14 @@ namespace EUROPA{
     m_requiresUpdate = true;
   }
 
-  int EquivalenceClassCollection::getGraphCount(){
+unsigned long EquivalenceClassCollection::getGraphCount(){
     recomputeIfNecessary();
     return m_graphsByKey.size();
   }
 
-  int EquivalenceClassCollection::getGraphKey(const ConstrainedVariableId& variable){
+  int EquivalenceClassCollection::getGraphKey(const ConstrainedVariableId variable){
     recomputeIfNecessary();
-    const ConstraintNodeId& node = getNode(variable);
+    const ConstraintNodeId node = getNode(variable);
     return node->getGraph();
   }
 
@@ -122,7 +122,7 @@ namespace EUROPA{
 
     // Iterate over all nodes
     for(std::map<ConstrainedVariableId, ConstraintNodeId>::iterator it = m_nodesByVar.begin(); it != m_nodesByVar.end(); ++it){
-      const ConstraintNodeId& node = it->second;
+      const ConstraintNodeId node = it->second;
       check_error(node.isValid());
       if(!node->hasBeenUpdated(m_nextCycle)) // means we have a new graph to build.
 	recomputeSingleGraph(node);
@@ -131,7 +131,7 @@ namespace EUROPA{
     return true;
   }
 
-  void EquivalenceClassCollection::recomputeSingleGraph(const ConstraintNodeId& node){
+  void EquivalenceClassCollection::recomputeSingleGraph(const ConstraintNodeId node){
     m_nextGraph++;
     // Initialize new graph with an empty set and obtain the reference to fill it up
     std::set<ConstrainedVariableId> emptySet;
@@ -149,7 +149,7 @@ namespace EUROPA{
       m_graphsByKey.erase(*it);
   }
 
-  const ConstraintNodeId& EquivalenceClassCollection::getNode(const ConstrainedVariableId& variable){
+  const ConstraintNodeId EquivalenceClassCollection::getNode(const ConstrainedVariableId variable){
     std::map<ConstrainedVariableId, ConstraintNodeId>::iterator it = m_nodesByVar.find(variable);
 
     if (it == m_nodesByVar.end()){ // Not present yet, so create a new entry
@@ -163,7 +163,7 @@ namespace EUROPA{
     return it->second;
   }
 
-  void EquivalenceClassCollection::removeNode(const ConstrainedVariableId& variable){
+  void EquivalenceClassCollection::removeNode(const ConstrainedVariableId variable){
     check_error(m_nodesByVar.find(variable) != m_nodesByVar.end());
     m_nodesByVar.erase(variable);
   }

@@ -5,6 +5,7 @@
 #include "ConstrainedVariable.hh"
 #include "SolverUtils.hh"
 #include "Debug.hh"
+#include "tinyxml.h"
 
 /**
  * @author Conor McGann
@@ -12,81 +13,85 @@
  * @file Provides implementation for core rule matching classes.
  */
 namespace EUROPA {
-  namespace SOLVERS {
+namespace SOLVERS {
 
-    MatchingRule::MatchingRule(const TiXmlElement& configData)
-      : Component(configData), 
-        m_context(),
-        m_objectType(WILD_CARD()), m_predicate(WILD_CARD()), m_variable(WILD_CARD()), 
-        m_masterObjectType(WILD_CARD()), m_masterPredicate(WILD_CARD()), m_masterRelation(WILD_CARD()),
-        m_tokenName(WILD_CARD()),
-        m_staticFilterCount(0), m_lastCycle(0), m_hitCount(0) {
+MatchingRule::MatchingRule(const TiXmlElement& configData)
+    : Component(configData), 
+      m_context(),
+      m_label(),
+      m_expression(),
+      m_objectType(WILD_CARD()), m_predicate(WILD_CARD()), m_variable(WILD_CARD()), 
+      m_masterObjectType(WILD_CARD()), m_masterPredicate(WILD_CARD()), 
+      m_masterRelation(WILD_CARD()),
+      m_tokenName(WILD_CARD()),
+      m_staticFilterCount(0), m_lastCycle(0), m_hitCount(0),
+      m_matchingEngine() {
+  
+  std::string expr;
+  if(configData.Attribute("label") != NULL){
+    m_label = configData.Attribute("label");
+    expr = "[" + m_label + "]";
+  }
 
-      std::string expr;
-      if(configData.Attribute("label") != NULL){
-        m_label = configData.Attribute("label");
-        expr = "[" + m_label.toString() + "]";
-      }
+  if(configData.Attribute("class-match") != NULL){
+    m_objectType = configData.Attribute("class-match");
+    m_staticFilterCount++;
+  }
+  else if(configData.Attribute("class") != NULL){
+    m_objectType = configData.Attribute("class");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("class-match") != NULL){
-        m_objectType = configData.Attribute("class-match");
-        m_staticFilterCount++;
-      }
-      else if(configData.Attribute("class") != NULL){
-        m_objectType = configData.Attribute("class");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("predicate-match") != NULL){
+    m_predicate = configData.Attribute("predicate-match");
+    m_staticFilterCount++;
+  }
+  else if(configData.Attribute("predicate") != NULL){
+    m_predicate = configData.Attribute("predicate");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("predicate-match") != NULL){
-        m_predicate = configData.Attribute("predicate-match");
-        m_staticFilterCount++;
-      }
-      else if(configData.Attribute("predicate") != NULL){
-        m_predicate = configData.Attribute("predicate");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("var-match") != NULL){
+    m_variable = configData.Attribute("var-match");
+    m_staticFilterCount++;
+  }
+  else if(configData.Attribute("variable") != NULL){
+    m_variable = configData.Attribute("variable");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("var-match") != NULL){
-        m_variable = configData.Attribute("var-match");
-        m_staticFilterCount++;m_variable.toString();
-      }
-      else if(configData.Attribute("variable") != NULL){
-        m_variable = configData.Attribute("variable");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("masterRelation") != NULL){
+    m_masterRelation = configData.Attribute("masterRelation");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("masterRelation") != NULL){
-        m_masterRelation = configData.Attribute("masterRelation");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("masterClass") != NULL){
+    m_masterObjectType = configData.Attribute("masterClass");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("masterClass") != NULL){
-        m_masterObjectType = configData.Attribute("masterClass");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("masterPredicate") != NULL){
+    m_masterPredicate = configData.Attribute("masterPredicate");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("masterPredicate") != NULL){
-        m_masterPredicate = configData.Attribute("masterPredicate");
-        m_staticFilterCount++;
-      }
+  if(configData.Attribute("tokenName") != NULL){
+    m_tokenName = configData.Attribute("tokenName");
+    m_staticFilterCount++;
+  }
 
-      if(configData.Attribute("tokenName") != NULL){
-        m_tokenName = configData.Attribute("tokenName");
-        m_staticFilterCount++;
-      }
+  expr = expr + m_objectType + "." +
+         m_predicate + "." +
+         m_variable + "." +
+         m_masterRelation + "." +
+         m_masterObjectType + "." +
+         m_masterPredicate; //+ "." +
+  //m_tokenName.toString(); // TODO: add this and fix regresion tests
 
-      expr = expr + m_objectType.toString() + "." +
-        m_predicate.toString() + "." +
-        m_variable.toString() + "." +
-        m_masterRelation.toString() + "." +
-        m_masterObjectType.toString() + "." +
-        m_masterPredicate.toString(); //+ "." +
-        //m_tokenName.toString(); // TODO: add this and fix regresion tests
+  setExpression(expr);
+}
 
-      setExpression(expr);
-    }
-
-    void MatchingRule::initialize(const MatchingEngineId& matchingEngine){
+    void MatchingRule::initialize(const MatchingEngineId matchingEngine){
       m_matchingEngine = matchingEngine;
       m_matchingEngine->registerRule(getId());
     }
@@ -117,30 +122,30 @@ namespace EUROPA {
 
     bool MatchingRule::filteredByObjectType() const { return m_objectType != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::objectTypeFilter() const{ return m_objectType;}
+    const std::string& MatchingRule::objectTypeFilter() const{ return m_objectType;}
 
     bool MatchingRule::filteredByPredicate() const{ return m_predicate != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::predicateFilter() const{ return m_predicate; }
+    const std::string& MatchingRule::predicateFilter() const{ return m_predicate; }
 
     bool MatchingRule::filteredByVariable() const{ return m_variable != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::variableFilter() const { return m_variable; }
+    const std::string& MatchingRule::variableFilter() const { return m_variable; }
 
     bool MatchingRule::filteredByMasterObjectType() const{ return m_objectType != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::masterObjectTypeFilter() const { return m_masterObjectType; }
+    const std::string& MatchingRule::masterObjectTypeFilter() const { return m_masterObjectType; }
 
     bool MatchingRule::filteredByMasterPredicate() const{ return m_objectType != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::masterPredicateFilter() const { return m_masterPredicate; }
+    const std::string& MatchingRule::masterPredicateFilter() const { return m_masterPredicate; }
 
     bool MatchingRule::filteredByMasterRelation() const{ return m_masterRelation != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::masterRelationFilter() const { return m_masterRelation; }
+    const std::string& MatchingRule::masterRelationFilter() const { return m_masterRelation; }
 
     bool MatchingRule::filteredByTokenName() const{ return m_tokenName != WILD_CARD(); }
 
-    const LabelStr& MatchingRule::tokenNameFilter() const { return m_tokenName; }
+    const std::string& MatchingRule::tokenNameFilter() const { return m_tokenName; }
   }
 }

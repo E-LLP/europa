@@ -40,7 +40,8 @@ class TestEngine : public EuropaEngine
 /**
    TODO: REPLAY IS BROKEN WITH THE INTERPRETER AND NEEDS TO BE FIXED!!!!
  */
-void replay(const std::string& s1,const DbClientTransactionLogId& txLog, const char* language)
+namespace {
+void replay(const std::string& s1,const DbClientTransactionLogId , const char* language)
 {
   TestEngine replayed;
   replayed.playTransactions(TestEngine::TX_LOG(),language);
@@ -75,19 +76,17 @@ bool runPlanner(const char* modelFile,
 
   try {
     assert(engine.plan(modelFile,plannerConfig,language));
-
     debugMsg("Main:runPlanner", "Found a plan at depth "
              << engine.getDepthReached() << " after " << engine.getTotalNodesSearched());
-
+    engine.write(std::cout);
     if(replayRequired) {
-      engine.write(std::cout);
       std::string s1 = PlanDatabaseWriter::toString(engine.getPlanDatabase(), false);
       std::ofstream out(TestEngine::TX_LOG());
       txLog->flush(out);
       out.close();
       replay(s1, txLog,language);
-      std::cout << engine.getPlanDatabase()->toString();///
     }
+    std::cout << engine.getPlanDatabase()->toString() << std::endl;///
 
     debugMsg("IdTypeCounts", dumpIdTable("after"));
   }
@@ -127,7 +126,7 @@ bool copyFromFile(const char* language){
 
   return true;
 }
-
+}
 // Args to main()
 #define ARGC 4
 #define MODEL_INDEX 1
@@ -163,11 +162,13 @@ int main(int argc, const char** argv)
 
     if (performanceTest != NULL && strcmp(performanceTest, "1") == 0) {
         replayRequired = false;
-        EUROPA_runTest(runPlanner,modelFile,plannerConfig,language,replayRequired);
+        assert(runPlanner(modelFile, plannerConfig, language, replayRequired));
+        // EUROPA_runTest(runPlanner,modelFile,plannerConfig,language,replayRequired);
     }
     else {
         replayRequired = false; //= true;
-        EUROPA_runTest(runPlanner,modelFile,plannerConfig,language,replayRequired);
+        assert(runPlanner(modelFile, plannerConfig, language, replayRequired));
+        // EUROPA_runTest(runPlanner,modelFile,plannerConfig,language,replayRequired);
         //EUROPA_runTest(copyFromFile,language);
     }
 

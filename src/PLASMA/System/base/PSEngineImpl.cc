@@ -4,8 +4,6 @@
  */
 
 #include "PSEngineImpl.hh"
-
-#include "LabelStr.hh"
 #ifdef _MSC_VER
 #include "Pdlfcn.hh"
 #endif
@@ -24,9 +22,7 @@ namespace EUROPA {
 	  return new PSEngineImpl();
   }
 
-  PSEngineImpl::PSEngineImpl()
-  {
-  }
+PSEngineImpl::PSEngineImpl() : m_started(false) {}
 
   PSEngineImpl::~PSEngineImpl()
   {
@@ -195,7 +191,7 @@ namespace EUROPA {
   PSSolver* PSEngineImpl::createSolver(const std::string& configurationFile)
   {
     check_runtime_error(isStarted(),"PSEngine has not been started");
-    return ((PSSolverManager*)getComponent("PSSolverManager"))->createSolver(configurationFile);
+    return boost::polymorphic_cast<PSSolverManager*>(getComponent("PSSolverManager"))->createSolver(configurationFile);
   }
 
 }

@@ -1,5 +1,5 @@
-#ifndef _H_PlanDatabase
-#define _H_PlanDatabase
+#ifndef H_PlanDatabase
+#define H_PlanDatabase
 /**
  * @file   PlanDatabase.hh
  * @author Conor McGann
@@ -14,7 +14,6 @@
 #include "PSPlanDatabase.hh"
 #include "PlanDatabaseListener.hh"
 #include "Schema.hh"
-#include "LabelStr.hh"
 #include "DbClient.hh"
 #include "Engine.hh"
 
@@ -52,24 +51,24 @@ namespace EUROPA {
                  PURGED
     };
 
-    PlanDatabase(const ConstraintEngineId& constraintEngine, const SchemaId& schema);
+    PlanDatabase(const ConstraintEngineId constraintEngine, const SchemaId schema);
 
     ~PlanDatabase();
 
-    const PlanDatabaseId& getId() const;
+    const PlanDatabaseId getId() const;
 
-    const ConstraintEngineId& getConstraintEngine() const;
+    const ConstraintEngineId getConstraintEngine() const;
 
-    const SchemaId& getSchema() const;
+    const SchemaId getSchema() const;
 
-    const TemporalAdvisorId& getTemporalAdvisor();
+    const TemporalAdvisorId getTemporalAdvisor();
 
-    void setTemporalAdvisor(const TemporalAdvisorId& temporalAdvisor);
+    void setTemporalAdvisor(const TemporalAdvisorId temporalAdvisor);
 
     /**
      * @brief Retrieve a client interface which provides an interception point for all transactions.
      */
-    const DbClientId& getClient() const;
+    const DbClientId getClient() const;
 
     /**
      * @brief Retrieve an entity given its key value.
@@ -94,18 +93,18 @@ namespace EUROPA {
     /**
      * @brief Returns the set of all active tokens by predicate.
      */
-    const TokenSet& getActiveTokens(const LabelStr& predicate) const;
+    const TokenSet& getActiveTokens(const std::string& predicate) const;
 
     /**
      * @brief Register an allocated global variable.
-     * @param var. The variable to be registered. Must not have a parent. Furthermore, the name of the variable must be unique in this scope.
+     * @param var The variable to be registered. Must not have a parent. Furthermore, the name of the variable must be unique in this scope.
      */
-    void registerGlobalVariable(const ConstrainedVariableId& var);
+    void registerGlobalVariable(const ConstrainedVariableId var);
 
     /**
      * @brief Un-register an allocated global variable.
      */
-    void unregisterGlobalVariable(const ConstrainedVariableId& var);
+    void unregisterGlobalVariable(const ConstrainedVariableId var);
 
     /**
      * @brief Return all global variables registered with the plan database as such
@@ -118,27 +117,27 @@ namespace EUROPA {
      * @brief Access a global variable by name.
      * @return The variable. It is an error if the variable is not present, or is corrupt in any way.
      */
-    const ConstrainedVariableId& getGlobalVariable(const LabelStr& varName) const;
+    const ConstrainedVariableId getGlobalVariable(const std::string& varName) const;
 
     /**
      * @brief Test of a global exists for a given name
      * @return true of present, otherwise false.
      */
-    bool isGlobalVariable(const LabelStr& varName) const;
+    bool isGlobalVariable(const std::string& varName) const;
 
-    void registerGlobalToken(const TokenId& t);
-    void unregisterGlobalToken(const TokenId& t);
+    void registerGlobalToken(const TokenId t);
+    void unregisterGlobalToken(const TokenId t);
     const TokenSet& getGlobalTokens() const;
-    const TokenId& getGlobalToken(const LabelStr& varName) const;
-    bool isGlobalToken(const LabelStr& varName) const;
+    const TokenId getGlobalToken(const std::string& varName) const;
+    bool isGlobalToken(const std::string& varName) const;
 
     /**
      * @brief Test if the given inactive token has any tokens with which it can merge.
-     * @param inactiveToken
+     * @param inactiveToken The token to check for merge candidates.
      * @return true if there is 1 or more tokens with which to merge, otherwse false.
      * @see getCompatibleTokens, countCompatibleTokens
      */
-    bool hasCompatibleTokens(const TokenId& inactiveToken);
+    bool hasCompatibleTokens(const TokenId inactiveToken);
 
     /**
      * @brief Retrieves a collection of all Tokens that are compatible with the given token.
@@ -147,7 +146,7 @@ namespace EUROPA {
      * @param results A (initially empty) collection to be populated with all compatible tokens.
      * All returned elements must be active().
      */
-    void getCompatibleTokens(const TokenId& inactiveToken,
+    void getCompatibleTokens(const TokenId inactiveToken,
 			     std::vector<TokenId>& results);
 
     /**
@@ -159,11 +158,11 @@ namespace EUROPA {
      * @param limit Sets a limit to the quantity returned. Use to reduce cost of getting choices.
      * @param useExactTest If true, use a much more expensive but more rigorous comparison of timepoints.
      */
-    void getCompatibleTokens(const TokenId& inactiveToken,
+    void getCompatibleTokens(const TokenId inactiveToken,
 			     std::vector<TokenId>& results,
 			     unsigned int limit,
 			     bool useExactTest);
-//     void getCompatibleTokens(const TokenId& inactiveToken,
+//     void getCompatibleTokens(const TokenId inactiveToken,
 // 			     std::vector<TokenId>& results,
 // 			     eint limit,
 // 			     bool useExactTest);
@@ -172,20 +171,20 @@ namespace EUROPA {
      * @brief Returns a count of compatible tokens up to the given limit
      * @see getCompatibleTokens
      */
-    unsigned int countCompatibleTokens(const TokenId& inactiveToken,
+    unsigned long countCompatibleTokens(const TokenId inactiveToken,
 #ifdef _MSC_VER
-				       unsigned int limit = UINT_MAX,  //std::numeric_limits<unsigned int>::max(),
+                                        unsigned int limit = UINT_MAX,  //std::numeric_limits<unsigned int>::max(),
 #else
-                                       unsigned int limit = std::numeric_limits<unsigned int>::max(),
+                                        unsigned int limit = std::numeric_limits<unsigned int>::max(),
 #endif //_MSC_VER
-				       bool useExactTest = false);
+                                        bool useExactTest = false);
 
     /**
      * @brief Returns the last count obtained for the prior call to query the set of compatible tokens. This can be useful
      * as a 'probable' indicator of the count of compatible tokens in the next call.
      * @see countCompatibleTokens, getCompatibleTokens
      */
-    unsigned int lastCompatibleTokenCount(const TokenId& inactiveToken) const;
+    unsigned int lastCompatibleTokenCount(const TokenId inactiveToken) const;
 
     /**
      * @brief Retrieves the map relating token keys and the set of objects that induce an ordering requirement on the token.
@@ -200,7 +199,7 @@ namespace EUROPA {
      * @param limit An upper bound on the number of choices to return.
      * @see getTokensToOrder
      */
-    void getOrderingChoices(const TokenId& tokenToOrder,
+    void getOrderingChoices(const TokenId tokenToOrder,
 			    std::vector< OrderingChoice >& results,
 #ifdef _MSC_VER
 			    unsigned int limit = UINT_MAX  //std::numeric_limits<unsigned int>::max(),
@@ -212,11 +211,11 @@ namespace EUROPA {
      * @brief Returns a count or all ordering choices for a token up to the given limit
      * @see Object::getOrderingChoices
      */
-    unsigned int countOrderingChoices(const TokenId& token,
+    unsigned long countOrderingChoices(const TokenId token,
 #ifdef _MSC_VER
-				      unsigned int limit = UINT_MAX  //std::numeric_limits<unsigned int>::max(),
+				      unsigned long limit = UINT_MAX  //std::numeric_limits<unsigned int>::max(),
 #else
-				      unsigned int limit = std::numeric_limits<unsigned int>::max()
+				      unsigned long limit = std::numeric_limits<unsigned long>::max()
 #endif //_MSC_VER
 				      );
     /**
@@ -224,12 +223,12 @@ namespace EUROPA {
      * @param token The token for which we want ordering choices. Cannot be rejected.
      * @return The last count value
      */
-    unsigned int lastOrderingChoiceCount(const TokenId& token) const;
+    unsigned long lastOrderingChoiceCount(const TokenId token) const;
 
     /**
      * @brief True if there is at least one ordering choice
      */
-    bool hasOrderingChoice(const TokenId& token);
+    bool hasOrderingChoice(const TokenId token);
 
     /**
      * @brief Retrieves a collection of object instances of the given type. Database must be closed.
@@ -237,18 +236,18 @@ namespace EUROPA {
      * @param results A (initially empty) collection to be populated with all instances of that type.
      */
     template<class ID>
-    void getObjectsByType(const LabelStr& type, std::list<ID>& results);
+    void getObjectsByType(const std::string& type, std::list<ID>& results);
 
     /**
      * @brief Are there any object instances of the specified type?
      */
-    bool hasObjectInstances(const LabelStr& objectType) const;
+    bool hasObjectInstances(const std::string& objectType) const;
 
     /**
      * @brief Lookup an object by name. It is an error if the object is not present.
      * @return The requested object
      */
-    const ObjectId& getObject(const LabelStr& name) const;
+    const ObjectId getObject(const std::string& name) const;
 
     /**
      * @brief Specifies that no more objects are to be added to the database.
@@ -261,7 +260,7 @@ namespace EUROPA {
      * Note that this will cause an error if Tokens have already been created for this type. This is
      * because we have the rule - once dynamic, always dynamic.
      */
-    void close(const LabelStr& objectType);
+    void close(const std::string& objectType);
 
     /**
      * @brief True if and only if close() has been called.
@@ -271,7 +270,7 @@ namespace EUROPA {
     /**
      * @brief True if close() has been called, or close(objectType) has been called
      */
-    bool isClosed(const LabelStr& objectType) const;
+    bool isClosed(const std::string& objectType) const;
 
     /**
      * @brief True if close() has not been called. This is because the schema cannot be assumed to be fixed, and we therefore
@@ -296,8 +295,8 @@ namespace EUROPA {
      * @param objectVar The variable to be populated and possibly synchronized. Must be open.
      * @param leaveOpen If true, the object var will remain open on completion.
      */
-    void makeObjectVariableFromType(const LabelStr& objectType,
-				    const ConstrainedVariableId& objectVar,
+    void makeObjectVariableFromType(const std::string& objectType,
+				    const ConstrainedVariableId objectVar,
 				    bool leaveOpen = false);
 
     /**
@@ -307,7 +306,7 @@ namespace EUROPA {
      * @note We can extend this to pass in a functor or some other object to allow it to handle archival details.
      * @see Object::archive
      */
-    unsigned int archive(eint tick = PLUS_INFINITY);
+    unsigned long archive(eint tick = PLUS_INFINITY);
 
 
     // PSPlanDatabase methods
@@ -321,18 +320,18 @@ namespace EUROPA {
 
     virtual PSList<PSVariable*> getAllGlobalVariables() const;
 
-    ObjectId createObject(const LabelStr& objectType,
-                            const LabelStr& objectName,
+    ObjectId createObject(const std::string& objectType,
+                            const std::string& objectName,
                             const std::vector<const Domain*>& arguments);
 
-    TokenId createToken(const char* tokenType,
-                        const char* tokenName,
+    TokenId createToken(const std::string& tokenType,
+                        const std::string& tokenName,
                         bool rejectable=false,
                         bool isFact=false);
 
-    TokenId createSlaveToken(const TokenId& master,
-                             const LabelStr& tokenType,
-                             const LabelStr& relation);
+    TokenId createSlaveToken(const TokenId master,
+                             const std::string& tokenType,
+                             const std::string& relation);
 
     bool hasTokenTypes() const;
 
@@ -346,63 +345,63 @@ namespace EUROPA {
     friend class PlanDatabaseListener;
     friend class ObjectVariableListener;
 
-    void notifyAdded(const ObjectId& object);
+    void notifyAdded(const ObjectId object);
 
-    void notifyRemoved(const ObjectId& object);
+    void notifyRemoved(const ObjectId object);
 
-    void notifyAdded(const TokenId& token);
+    void notifyAdded(const TokenId token);
 
-    void notifyRemoved(const TokenId& token);
+    void notifyRemoved(const TokenId token);
 
-    void notifyAdded(const ObjectId& object, const TokenId& token);
+    void notifyAdded(const ObjectId object, const TokenId token);
 
-    void notifyRemoved(const ObjectId& object, const TokenId& token);
+    void notifyRemoved(const ObjectId object, const TokenId token);
 
-    void notifyActivated(const TokenId& token);
+    void notifyActivated(const TokenId token);
 
-    void notifyDeactivated(const TokenId& token);
+    void notifyDeactivated(const TokenId token);
 
-    void notifyMerged(const TokenId& token);
+    void notifyMerged(const TokenId token);
 
-    void notifySplit(const TokenId& token);
+    void notifySplit(const TokenId token);
 
-    void notifyRejected(const TokenId& token);
+    void notifyRejected(const TokenId token);
 
-    void notifyReinstated(const TokenId& token);
+    void notifyReinstated(const TokenId token);
 
-    void notifyCommitted(const TokenId& token);
+    void notifyCommitted(const TokenId token);
 
-    void notifyTerminated(const TokenId& token);
+    void notifyTerminated(const TokenId token);
 
-    void notifyConstrained(const ObjectId& object, const TokenId& predecessor, const TokenId& successor);
+    void notifyConstrained(const ObjectId object, const TokenId predecessor, const TokenId successor);
 
-    void notifyFreed(const ObjectId& object, const TokenId& predecessor, const TokenId& successor);
+    void notifyFreed(const ObjectId object, const TokenId predecessor, const TokenId successor);
 
-    void notifyAdded(const PlanDatabaseListenerId& listener);
+    void notifyAdded(const PlanDatabaseListenerId listener);
 
-    void notifyRemoved(const PlanDatabaseListenerId& listener);
+    void notifyRemoved(const PlanDatabaseListenerId listener);
 
     /**
      * @brief If an object induces an ordering constraint on a token, it notfifies the plan database.
      * @param object The object on which the token should be ordered.
      * @param token The token to order
      */
-    void notifyOrderingRequired(const ObjectId& object, const TokenId& token);
+    void notifyOrderingRequired(const ObjectId object, const TokenId token);
 
     /**
      * @brief If an object's state has changed such that a previously required ordering is no longer required then it should
      * notify the plan database.
      */
-    void notifyOrderingNoLongerRequired(const ObjectId& object, const TokenId& token);
+    void notifyOrderingNoLongerRequired(const ObjectId object, const TokenId token);
 
-    void makeObjectVariable(const LabelStr& objectType, const std::list<ObjectId>& objects,
-			    const ConstrainedVariableId& objectVar,
+    void makeObjectVariable(const std::string& objectType, const std::list<ObjectId>& objects,
+			    const ConstrainedVariableId objectVar,
 			    bool leaveOpen = false);
 
-    void handleObjectVariableDeletion(const ConstrainedVariableId& objectVar);
+    void handleObjectVariableDeletion(const ConstrainedVariableId objectVar);
 
-    void handleObjectVariableCreation(const LabelStr& objectType,
-				      const ConstrainedVariableId& objectVar,
+    void handleObjectVariableCreation(const std::string& objectType,
+				      const ConstrainedVariableId objectVar,
 				      bool leaveOpen = false);
 
     /* Useful internal accessors and indexes for accessing objects and tokens in the PlanDatabase. */
@@ -413,17 +412,17 @@ namespace EUROPA {
      * @param results A collection, initially empty, which is an output parameter for results.
      * @see Schema::isPredicateDefined, Schema::canBeAssigned
      */
-    void getObjectsByPredicate(const LabelStr& predicate, std::list<ObjectId>& results);
+    void getObjectsByPredicate(const std::string& predicate, std::list<ObjectId>& results);
 
     /**
      * @brief Utility to index an active token.
      */
-    void insertActiveToken(const TokenId& token);
+    void insertActiveToken(const TokenId token);
 
     /**
      * @brief Utility to remove an active token
      */
-    void removeActiveToken(const TokenId& token);
+    void removeActiveToken(const TokenId token);
 
     PlanDatabaseId m_id;
     const ConstraintEngineId m_constraintEngine;
@@ -440,40 +439,44 @@ namespace EUROPA {
     std::vector<PlanDatabaseListenerId> m_listeners;
 
     /* In the data structures below, the key is a LabelStr representation of a name */
-    std::map<edouble, ObjectId> m_objectsByName; /*!< Object names are unique. Holds all objects m_objectsByName.size() == m_objects.size(). */
-    std::multimap<edouble, ObjectId> m_objectsByPredicate; /*!< May be updated every time we add a Token, or remove an object. */
-    std::multimap<edouble, ObjectId> m_objectsByType; /*!< May be updated every time we add a Token, or remove an object. */
-    std::set<edouble> m_closedObjectTypes; /*!< The set of explicitly closed object types.
+    std::map<std::string, ObjectId> m_objectsByName; /*!< Object names are unique. Holds all objects m_objectsByName.size() == m_objects.size(). */
+    std::multimap<std::string, ObjectId> m_objectsByPredicate; /*!< May be updated every time we add a Token, or remove an object. */
+    std::multimap<std::string, ObjectId> m_objectsByType; /*!< May be updated every time we add a Token, or remove an object. */
+    std::set<std::string> m_closedObjectTypes; /*!< The set of explicitly closed object types.
 					     If present here, it cannot be present in m_objectVariablesByType */
-    std::map<edouble, ConstrainedVariableId> m_globalVarsByName;
-    std::map<edouble, TokenId> m_globalTokensByName;
+    std::map<std::string, ConstrainedVariableId> m_globalVarsByName;
+    std::map<std::string, TokenId> m_globalTokensByName;
     std::map<eint, std::pair<TokenId, ObjectSet> > m_tokensToOrder; /*!< All tokens to order, with the object
 								     inducing the requirement stored in the set */
 
-    std::map<edouble, TokenSet > m_activeTokensByPredicate; /*!< All active tokens sorted by predicate */
+    std::map<std::string, TokenSet > m_activeTokensByPredicate; /*!< All active tokens sorted by predicate */
 
     // All this to store variables (and their listeners) for Open Object Types
-    typedef std::multimap<edouble, std::pair<ConstrainedVariableId, ConstrainedVariableListenerId> > ObjVarsByObjType;
+    typedef std::multimap<std::string, std::pair<ConstrainedVariableId, ConstrainedVariableListenerId> > ObjVarsByObjType;
     typedef ObjVarsByObjType::iterator ObjVarsByObjType_I;
     typedef ObjVarsByObjType::const_iterator ObjVarsByObjType_CI;
     ObjVarsByObjType m_objectVariablesByObjectType;
+private:
+    PlanDatabase(const PlanDatabase&);
+    PlanDatabase& operator=(const PlanDatabase&);
   };
 
 
-  template<class ID>
-  void PlanDatabase::getObjectsByType(const LabelStr& type, std::list<ID>& results) {
-    check_error(results.empty());
-    checkError(m_schema->isObjectType(type), "Is not an object type in the plan database: " + type.toString());
-
-    for (std::multimap<edouble, ObjectId>::const_iterator it = m_objectsByType.find(type.getKey());
-	 it != m_objectsByType.end() && it->first == type.getKey();
-	 ++it) {
-      debugMsg("PlanDatabase:getObjectsByType", "Adding object '" << it->second->getName().toString() << "' of type '" <<
-	       it->second->getType().toString() << "' for type '" << type.toString() << "'");
-      debugMsg("PlanDatabase:getObjectsByType", "Typeid for object: " << typeid((*(it->second))).name());
-      results.push_back(ID(it->second));
-    }
+template<class ID>
+void PlanDatabase::getObjectsByType(const std::string& type, std::list<ID>& results) {
+  check_error(results.empty());
+  checkError(m_schema->isObjectType(type),
+             "Is not an object type in the plan database: " + type);
+    
+  for (std::multimap<std::string, ObjectId>::const_iterator it = m_objectsByType.find(type);
+       it != m_objectsByType.end() && it->first == type; ++it) {
+    debugMsg("PlanDatabase:getObjectsByType",
+             "Adding object '" << it->second->getName() << "' of type '" <<
+             it->second->getType() << "' for type '" << type << "'");
+    debugMsg("PlanDatabase:getObjectsByType", "Typeid for object: " << typeid((*(it->second))).name());
+    results.push_back(ID(it->second));
   }
+}
 }
 
 #endif

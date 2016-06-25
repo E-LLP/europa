@@ -1,5 +1,5 @@
-#ifndef _H_ObjectTokenRelation
-#define _H_ObjectTokenRelation
+#ifndef H_ObjectTokenRelation
+#define H_ObjectTokenRelation
 
 #include "PlanDatabaseDefs.hh"
 #include "DomainListener.hh"
@@ -7,6 +7,7 @@
 
 namespace EUROPA
 {
+class ObjectDomain;
   /**
    * @brief Responsible for managing the relationship between objects and tokens through propagation of changes
    * in Token.state and Token.object.
@@ -20,25 +21,25 @@ namespace EUROPA
   class ObjectTokenRelation : public Constraint {
   public:
 
-    ObjectTokenRelation(const LabelStr& name,
-			const LabelStr& propagatorName,
-			const ConstraintEngineId& constraintEngine,
+    ObjectTokenRelation(const std::string& name,
+			const std::string& propagatorName,
+			const ConstraintEngineId constraintEngine,
 			const std::vector<ConstrainedVariableId>& variables);
 
     ~ObjectTokenRelation();
 
     void handleExecute();
 
-    void handleExecute(const ConstrainedVariableId& variable, 
-		       int argIndex, 
+    void handleExecute(const ConstrainedVariableId variable, 
+		       unsigned int argIndex, 
 		       const DomainListener::ChangeType& changeType);
 
-    bool canIgnore(const ConstrainedVariableId& variable, 
-		   int argIndex, 
+    bool canIgnore(const ConstrainedVariableId variable, 
+		   unsigned int argIndex, 
 		   const DomainListener::ChangeType& changeType);
 
     // This constraint doesn't modify any variables through inference
-    virtual const std::vector<ConstrainedVariableId>& getModifiedVariables(const ConstrainedVariableId& variable) const;
+    virtual const std::vector<ConstrainedVariableId>& getModifiedVariables(const ConstrainedVariableId variable) const;
     virtual const std::vector<ConstrainedVariableId>& getModifiedVariables() const;
 
   private:

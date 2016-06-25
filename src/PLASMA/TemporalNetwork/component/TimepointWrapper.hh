@@ -1,5 +1,5 @@
-#ifndef _H_TimePointWrapper
-#define _H_TimePointWrapper
+#ifndef H_TimePointWrapper
+#define H_TimePointWrapper
 
 #include "TemporalNetwork.hh"
 #include "TemporalNetworkDefs.hh"
@@ -20,10 +20,10 @@ namespace EUROPA {
     /**
      * @brief constructor 
      * @param prop Temporal propagator managing this timepoint
-     * @param tempVar 
-     * @param point
+     * @param tempVar  The temporal variable to wrap.
+     * @param point The timepoint representing the temporal variable.
      */
-    TimepointWrapper(const TemporalPropagatorId& prop, const ConstrainedVariableId& tempVar, const TimepointId& point);
+    TimepointWrapper(const TemporalPropagatorId prop, const ConstrainedVariableId tempVar, const TimepointId point);
  
     /**
      * @brief deconstructor
@@ -34,19 +34,19 @@ namespace EUROPA {
      * @brief accessor for unique id of this TimepointWrapper
      * @return unique id
      */
-    inline const EntityId& getId() { return m_id; }
+    inline const EntityId getId() { return m_id; }
 
     /**
      * @brief accessor for wrapped timepoint
      * @return timepoint
      */
-    inline const TimepointId& getTimepoint() const {return m_timepoint;}
+    inline const TimepointId getTimepoint() const {return m_timepoint;}
 
     /**
      * @brief accessor for constrained variable
      * @return constrained variable's id
      */
-    inline const ConstrainedVariableId& getTempVar() const {return m_tempVar;}
+    inline const ConstrainedVariableId getTempVar() const {return m_tempVar;}
   private:
     void handleDiscard();
     TemporalPropagatorId m_propagator;

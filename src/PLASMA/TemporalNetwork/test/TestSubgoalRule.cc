@@ -9,26 +9,26 @@ namespace EUROPA {
 
   class TestSubgoalRuleRoot : public RuleInstance {
   public:
-    TestSubgoalRuleRoot(const RuleId& rule, const TokenId& token, const PlanDatabaseId& pdb) : RuleInstance(rule, token, pdb) { 
+    TestSubgoalRuleRoot(const RuleId rule, const TokenId token, const PlanDatabaseId pdb) : RuleInstance(rule, token, pdb) { 
     }
     void handleExecute();
   }; 
 
-  RuleInstanceId TestSubgoalRule::createInstance(const TokenId& token, const PlanDatabaseId& pdb,
+  RuleInstanceId TestSubgoalRule::createInstance(const TokenId token, const PlanDatabaseId pdb,
                                                  const RulesEngineId &rulesEngine) const {
     RuleInstanceId rootInstance = (new TestSubgoalRuleRoot(m_id, token, pdb))->getId();
     rootInstance->setRulesEngine(rulesEngine);
     return rootInstance;
   }
 
-  TestSubgoalRule::TestSubgoalRule(const LabelStr& name) : Rule(name) {}
+  TestSubgoalRule::TestSubgoalRule(const std::string& name) : Rule(name) {}
 
   TestSubgoalRule::~TestSubgoalRule() { }
 
   void TestSubgoalRuleRoot::handleExecute() {
     TokenId slave =  (new IntervalToken(m_token,  
 				      "meets",
-				      LabelStr("Objects.PredicateB"), 
+				      "Objects.PredicateB", 
 				      IntervalIntDomain(0, 100),
 				      IntervalIntDomain(0, 100),
 				      IntervalIntDomain(1, 100),

@@ -5,140 +5,22 @@
 #include "Domains.hh"
 #include "Utils.hh"
 #include "Debug.hh"
+#include "CESchema.hh"
 #include <algorithm>
+#include <cmath>
 
 namespace EUROPA {
 
-  void requireArgCount(std::string name, const std::vector<DataTypeId>& argTypes, const unsigned int count) {
-      if (argTypes.size() != count) {
-	  std::ostringstream msg; msg << "Constraint " << name << " takes 2 args, not " << argTypes.size();
-          throw msg.str();
-      }
-  }
-
-  void mutuallyAssignable(std::string name, DataTypeId a, DataTypeId b) {
-      if (b->isNumeric() && b->isNumeric()) {
-	  //This is a hopefully temporary hack that makes the constraints work so the tests can pass. Waiting for agreement on the
-          //mailling list before deciding what to do in this case. Tony T. Pratkanis: 9/11/09.
-          return;
-      }
-      if (!b->isAssignableFrom(a) || !a->isAssignableFrom(b)) {
-          std::ostringstream msg; msg << "Constraint " << name << " args must be assignable. In this case, "
-				      << a->getName().c_str() << " and " << b->getName().c_str()
-				      << " are not assignable.";
-          throw msg.str();
-      }
-  }
-
-  void requireNumeric(std::string name, DataTypeId a) {
-      if (!a->isNumeric()) {
-          std::ostringstream msg; msg << "Constraint " << name << " args must be numeric. " << a->getName().c_str() << " is not.";
-          throw msg.str();
-      }
-  }
-
-  void requireBoolean(std::string name, DataTypeId a) {
-      if (!a->isBool()) {
-          std::ostringstream msg; msg << "Constraint " << name << " args must be numeric. " << a->getName().c_str() << " is not.";
-          throw msg.str();
-      }
-  }
-
-  void requireAllSame(std::string name, const std::vector<DataTypeId>& argTypes) {
-    for (unsigned int i = 0; i < argTypes.size(); i++) {
-      for (unsigned int u = i + 1; u < argTypes.size(); u++) {
-	mutuallyAssignable(name, argTypes[i], argTypes[u]);
-      }
-    }
-  }
-
-
-  void TwoSameArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 2);
-      mutuallyAssignable(m_name, argTypes[0], argTypes[1]);
-  }
-
-  void TwoSameNumericArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 2);
-      mutuallyAssignable(m_name, argTypes[0], argTypes[1]);
-      requireNumeric(m_name, argTypes[0]);
-      requireNumeric(m_name, argTypes[1]);
-  }
-
-  void TestOneArgumentCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 2);
-      requireBoolean(m_name, argTypes[0]);
-  }
-
-  void TestTwoSameArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 3);
-      mutuallyAssignable(m_name, argTypes[1], argTypes[2]);
-      requireBoolean(m_name, argTypes[0]);
-  }
-
-  void TestTwoSameNumericArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 3);
-      mutuallyAssignable(m_name, argTypes[1], argTypes[2]);
-      requireBoolean(m_name, argTypes[0]);
-      requireNumeric(m_name, argTypes[1]);
-      requireNumeric(m_name, argTypes[2]);
-  }
-
-  void TwoBooleanArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 2);
-      mutuallyAssignable(m_name, argTypes[0], argTypes[1]);
-      requireBoolean(m_name, argTypes[0]);
-      requireBoolean(m_name, argTypes[1]);
-  }
-
-  void ThreeBooleanArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireArgCount(m_name, argTypes, 3);
-      mutuallyAssignable(m_name, argTypes[0], argTypes[1]);
-      mutuallyAssignable(m_name, argTypes[1], argTypes[2]);
-      mutuallyAssignable(m_name, argTypes[0], argTypes[2]);
-      requireBoolean(m_name, argTypes[0]);
-      requireBoolean(m_name, argTypes[1]);
-      requireBoolean(m_name, argTypes[2]);
-  }
-
-  void AllSameArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireAllSame(m_name, argTypes);
-  }
-
-  void AllSameNumericArgumentsCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      requireAllSame(m_name, argTypes);
-      for (unsigned int i = 0; i < argTypes.size(); i++) {
-	requireNumeric(m_name, argTypes[i]);
-      }
-  }
-
-
-
-
-
-
-
-
-
   UnaryConstraint::UnaryConstraint(const Domain& dom,
-				   const ConstrainedVariableId& var)
+				   const ConstrainedVariableId var)
     : Constraint("UNARY", "Default", var->getConstraintEngine(), makeScope(var)),
       m_x(dom.copy()),
       m_y(static_cast<Domain*>(& (getCurrentDomain(var)))) {
   }
 
-  UnaryConstraint::UnaryConstraint(const LabelStr& name,
-				   const LabelStr& propagatorName,
-				   const ConstraintEngineId& constraintEngine,
+  UnaryConstraint::UnaryConstraint(const std::string& name,
+				   const std::string& propagatorName,
+				   const ConstraintEngineId constraintEngine,
 				   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_x(0),
@@ -164,8 +46,8 @@ namespace EUROPA {
     m_x = 0;
   }
 
-  bool UnaryConstraint::canIgnore(const ConstrainedVariableId& variable,
-				  int argIndex,
+  bool UnaryConstraint::canIgnore(const ConstrainedVariableId,
+				  unsigned int argIndex,
 				  const DomainListener::ChangeType& changeType){
     checkError(argIndex == 0, "Cannot have more than one variable in scope.");
 
@@ -177,52 +59,49 @@ namespace EUROPA {
       return true;
   }
 
-  void UnaryConstraint::setSource(const ConstraintId& sourceConstraint){
+  void UnaryConstraint::setSource(const ConstraintId sourceConstraint){
     checkError(m_x == 0, "Already set domain for " << toString() << " and not using " << sourceConstraint->toString());
-    UnaryConstraint* source = (UnaryConstraint*) sourceConstraint;
+    UnaryConstraint* source = id_cast<UnaryConstraint>(sourceConstraint);
     m_x = source->m_x->copy();
   }
 
-  /*************** AddEqualConstraint **********************/
 
-  void AddEqualCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      if (argTypes.size() != 3) {
-          std::ostringstream msg; msg << "Constraint AddEqual takes 3 args, not " << argTypes.size();
-          throw msg.str();
-      }
-
-      for (unsigned int i=0; i< argTypes.size(); i++) {
-          if (!argTypes[i]->isNumeric()) {
-              std::ostringstream msg;
-              msg << "Parameter " << i << " for Constraint AddEqual is not numeric : "
-                  << argTypes[i]->getName().toString();
-              throw msg.str();
-          }
-      }
-
-      if (!argTypes[0]->isAssignableFrom(argTypes[1]) ||
-          !argTypes[0]->isAssignableFrom(argTypes[2])) {
-          std::ostringstream msg;
-          msg << argTypes[0]->getName().toString() << " can't hold the result of : "
-              << argTypes[1]->getName().toString() << "+"
-              << argTypes[2]->getName().toString();
-          throw msg.str();
-      }
-  }
-
-
-  AddEqualConstraint::AddEqualConstraint(const LabelStr& name,
-					 const LabelStr& propagatorName,
-					 const ConstraintEngineId& constraintEngine,
+  AddEqualConstraint::AddEqualConstraint(const std::string& name,
+					 const std::string& propagatorName,
+					 const ConstraintEngineId constraintEngine,
 					 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_x(getCurrentDomain(m_variables[X])),
       m_y(getCurrentDomain(m_variables[Y])),
       m_z(getCurrentDomain(m_variables[Z]))
   {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
+    check_error(variables.size() ==  ARG_COUNT);
   }
+
+
+  /**
+   * Utility class that might get promoted later.
+   */
+  class Infinity {
+  public:
+    static edouble plus(edouble n1, edouble n2, edouble defaultValue) {
+      if (std::abs(n1) >= PLUS_INFINITY || std::abs(n2) >= PLUS_INFINITY)
+	return(defaultValue);
+      edouble retval = n1 + n2;
+      if(std::abs(retval) >= PLUS_INFINITY)
+	return defaultValue;
+      return retval;
+    }
+
+    static edouble minus(edouble n1, edouble n2, edouble defaultValue) {
+      if (std::abs(n1) >= PLUS_INFINITY || std::abs(n2) >= PLUS_INFINITY)
+	return(defaultValue);
+      edouble retval = n1 - n2;
+      if(std::abs(retval) >= PLUS_INFINITY)
+	return defaultValue;
+      return retval;
+    }
+  };
 
   void AddEqualConstraint::handleExecute() {
     static unsigned int sl_counter(0);
@@ -293,13 +172,13 @@ namespace EUROPA {
   }
 
   /*********** MultEqualConstraint: X*Y = Z *************/
-  MultEqualConstraint::MultEqualConstraint(const LabelStr& name,
-                                           const LabelStr& propagatorName,
-                                           const ConstraintEngineId& constraintEngine,
+  MultEqualConstraint::MultEqualConstraint(const std::string& name,
+                                           const std::string& propagatorName,
+                                           const ConstraintEngineId constraintEngine,
                                            const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
-    for (int i = 0; i < ARG_COUNT; i++)
+    check_error(variables.size() ==  ARG_COUNT);
+    for (unsigned int i = 0; i < ARG_COUNT; i++)
       check_error(!getCurrentDomain(m_variables[i]).isEnumerated());
   }
 /*
@@ -406,109 +285,110 @@ namespace EUROPA {
    */
   // Update Z's domain bounds using domains of X and Y in: X * Y = Z.
   // Return TRUE if we have new bounds for Z
-  bool updateMultBounds(IntervalDomain& domZ,
+namespace {
+bool updateMultBounds(IntervalDomain& domZ,
                       const IntervalDomain& domX,
                       const IntervalDomain& domY)
-  {
-    // Can not do any update if the domain of any variable is empty
-    if(domX.isEmpty() || domY.isEmpty() || domZ.isEmpty())
+{
+  // Can not do any update if the domain of any variable is empty
+  if(domX.isEmpty() || domY.isEmpty() || domZ.isEmpty())
+    return false;
+
+  edouble xMin, yMin, xMax, yMax, zMin, zMax, a, b, c, d;
+  domX.getBounds(xMin, xMax);
+  domY.getBounds(yMin, yMax);
+
+  a = xMin * yMin;
+  b = xMin * yMax;
+  c = xMax * yMin;
+  d = xMax * yMax;
+
+  zMin = std::min(std::min(a,b),std::min(c,d));
+  zMax = std::max(std::max(a,b),std::max(c,d));
+
+  return domZ.intersect(zMin,zMax);
+}
+
+// Update Z's domain bounds using domains of X and Y in: X / Y = Z.
+// Return TRUE if we have new bounds for Z
+// NOTE: given the division-by-zero problem, there will be many different scenarios that need
+// special treatments
+bool updateDivBounds(IntervalDomain& domZ,
+                     const IntervalDomain& domX,
+                     const IntervalDomain& domY)
+{
+  // Can not do any update if the domain of any variable is empty
+  if(domX.isEmpty() || domY.isEmpty() || domZ.isEmpty())
+    return false;
+
+  edouble xMin, yMin, xMax, yMax, zMin, zMax, a, b, c, d;
+  domX.getBounds(xMin, xMax);
+  domY.getBounds(yMin, yMax);
+
+
+  // if [Y] = {0} (singleton 0 value)
+  if(yMin == 0.0 && yMax == 0.0) {
+    // If [X] doesn't contain 0 then inconsistent -> empty Z domain
+    // NOTE: alternatively, [X] can be emptied instead of [Z] but it doesn't matter
+    // with the current mechanism in Europa
+    if((xMin > 0.0 || xMax < 0.0)) {
+      domZ.empty();
+      return true;
+    } else {
+      // If 0 \in [X] then no bound tightening (because 0/0 can be anything)
       return false;
+    }
+  }
 
-    edouble xMin, yMin, xMax, yMax, zMin, zMax, a, b, c, d;
-    domX.getBounds(xMin, xMax);
-    domY.getBounds(yMin, yMax);
+  // If 0 \in [Y] but 0 is not one of the bounds then no tightening
+  // NOTE: regardless of the bounds of X because [Y] contains both positive & negative values
+  if(yMin < 0.0 && yMax > 0.0)
+    return false;
 
-    a = xMin * yMin;
-    b = xMin * yMax;
-    c = xMax * yMin;
-    d = xMax * yMax;
+  // If [Y] doesn't contain 0. Safely compute the two possible new bounds
+  if(yMin > 0.0 || yMax < 0.0) {
+    a = xMin / yMin;
+    b = xMin / yMax;
+    c = xMax / yMin;
+    d = xMax / yMax;
 
     zMin = std::min(std::min(a,b),std::min(c,d));
     zMax = std::max(std::max(a,b),std::max(c,d));
-
     return domZ.intersect(zMin,zMax);
   }
 
-  // Update Z's domain bounds using domains of X and Y in: X / Y = Z.
-  // Return TRUE if we have new bounds for Z
-  // NOTE: given the division-by-zero problem, there will be many different scenarios that need
-  // special treatments
-  bool updateDivBounds(IntervalDomain& domZ,
-      const IntervalDomain& domX,
-      const IntervalDomain& domY)
-  {
-    // Can not do any update if the domain of any variable is empty
-    if(domX.isEmpty() || domY.isEmpty() || domZ.isEmpty())
-      return false;
+  // if lb[Y] = 0 OR ub[Y] = 0 and ub[Y] > lb[Y] (i.e., 0 is one but not both bounds of [Y])
+  // and 0 \in [X] then there is no bound tightening (because 0/0 can be anything)
+  if((yMin == 0.0 || yMax == 0.0) && (xMin <= 0.0 && xMax >= 0.0))
+    return false;
 
-    edouble xMin, yMin, xMax, yMax, zMin, zMax, a, b, c, d;
-    domX.getBounds(xMin, xMax);
-    domY.getBounds(yMin, yMax);
+  /*
+   * if lb[Y] = 0 OR ub[Y] = 0 and [X] doesn't contain 0, then we can compute one of the bounds
+   */
+  // One of the bounds will be \infinity so we will initialize both of the potential
+  // new [Z]'s bounds with the existing bounds on [Z]
+  domZ.getBounds(zMin, zMax);
 
+  // Case 1 [+,+] / [0,+]: new bounds [xMin / yMax, +infinity]
+  if(yMin == 0.0 && xMin > 0.0)
+    zMin = xMin / yMax;
 
-    // if [Y] = {0} (singleton 0 value)
-    if(yMin == 0.0 && yMax == 0.0) {
-        // If [X] doesn't contain 0 then inconsistent -> empty Z domain
-        // NOTE: alternatively, [X] can be emptied instead of [Z] but it doesn't matter
-        // with the current mechanism in Europa
-        if((xMin > 0.0 || xMax < 0.0)) {
-          domZ.empty();
-          return true;
-        } else {
-          // If 0 \in [X] then no bound tightening (because 0/0 can be anything)
-          return false;
-        }
-    }
+  // Case 2 [-,-] / [0,+] : new bounds [-infinity, xMax / yMax]
+  if(yMin == 0.0 && xMax < 0.0)
+    zMax = xMax / yMax;
 
-    // If 0 \in [Y] but 0 is not one of the bounds then no tightening
-    // NOTE: regardless of the bounds of X because [Y] contains both positive & negative values
-    if(yMin < 0.0 && yMax > 0.0)
-      return false;
+  // Case 3 [+,+] / [-,0]: new bounds [-infinity, xMin /yMin]
+  if(yMax == 0.0 && xMin > 0.0)
+    zMax = xMin / yMin;
 
-    // If [Y] doesn't contain 0. Safely compute the two possible new bounds
-    if(yMin > 0.0 || yMax < 0.0) {
-      a = xMin / yMin;
-      b = xMin / yMax;
-      c = xMax / yMin;
-      d = xMax / yMax;
+  // Case 4 [-,-] / [-,0]: new bounds [xMax / yMin, +infinity ]
+  if(yMax == 0.0 && xMax < 0.0)
+    zMin = xMax / yMin;
 
-      zMin = std::min(std::min(a,b),std::min(c,d));
-      zMax = std::max(std::max(a,b),std::max(c,d));
-      return domZ.intersect(zMin,zMax);
-    }
-
-    // if lb[Y] = 0 OR ub[Y] = 0 and ub[Y] > lb[Y] (i.e., 0 is one but not both bounds of [Y])
-    // and 0 \in [X] then there is no bound tightening (because 0/0 can be anything)
-    if((yMin == 0.0 || yMax == 0.0) && (xMin <= 0.0 && xMax >= 0.0))
-      return false;
-
-    /*
-     * if lb[Y] = 0 OR ub[Y] = 0 and [X] doesn't contain 0, then we can compute one of the bounds
-     */
-    // One of the bounds will be \infinity so we will initialize both of the potential
-    // new [Z]'s bounds with the existing bounds on [Z]
-    domZ.getBounds(zMin, zMax);
-
-    // Case 1 [+,+] / [0,+]: new bounds [xMin / yMax, +infinity]
-    if(yMin == 0.0 && xMin > 0.0)
-      zMin = xMin / yMax;
-
-    // Case 2 [-,-] / [0,+] : new bounds [-infinity, xMax / yMax]
-    if(yMin == 0.0 && xMax < 0.0)
-      zMax = xMax / yMax;
-
-    // Case 3 [+,+] / [-,0]: new bounds [-infinity, xMin /yMin]
-    if(yMax == 0.0 && xMin > 0.0)
-      zMax = xMin / yMin;
-
-    // Case 4 [-,-] / [-,0]: new bounds [xMax / yMin, +infinity ]
-    if(yMax == 0.0 && xMax < 0.0)
-      zMin = xMax / yMin;
-
-    // Set the new bounds
-    return domZ.intersect(zMin,zMax);
-  }
-
+  // Set the new bounds
+  return domZ.intersect(zMin,zMax);
+}
+}
   void MultEqualConstraint::handleExecute() {
     IntervalDomain& domX = static_cast<IntervalDomain&>(getCurrentDomain(m_variables[X]));
     IntervalDomain& domY = static_cast<IntervalDomain&>(getCurrentDomain(m_variables[Y]));
@@ -542,14 +422,14 @@ namespace EUROPA {
 
 
   /*********** DivEqualConstraint: X/Y = Z *************/
-  DivEqualConstraint::DivEqualConstraint(const LabelStr& name,
-                                           const LabelStr& propagatorName,
-                                           const ConstraintEngineId& constraintEngine,
+  DivEqualConstraint::DivEqualConstraint(const std::string& name,
+                                           const std::string& propagatorName,
+                                           const ConstraintEngineId constraintEngine,
                                            const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables)
   {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
-    for (int i = 0; i < ARG_COUNT; i++)
+    check_error(variables.size() == ARG_COUNT);
+    for (unsigned int i = 0; i < ARG_COUNT; i++)
       check_error(!getCurrentDomain(m_variables[i]).isEnumerated());
   }
 
@@ -587,15 +467,15 @@ namespace EUROPA {
   }
 
   /*********** EqualConstraint *************/
-  EqualConstraint::EqualConstraint(const LabelStr& name,
-				   const LabelStr& propagatorName,
-				   const ConstraintEngineId& constraintEngine,
+  EqualConstraint::EqualConstraint(const std::string& name,
+				   const std::string& propagatorName,
+				   const ConstraintEngineId constraintEngine,
 				   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables), m_argCount(variables.size()) {}
 
   /**
    * @brief Restrict all variables to the intersection of their domains.
-   * @see equate(const ConstrainedVariableId& v1, const ConstrainedVariableId& v2, bool& isEmpty) for details of handling
+   * @see equate(const ConstrainedVariableId v1, const ConstrainedVariableId v2, bool& isEmpty) for details of handling
    * issues with open and closed domains.
    */
   void EqualConstraint::handleExecute() {
@@ -616,7 +496,7 @@ namespace EUROPA {
     //is now equal to the intersection of all of the variables,
     //we can just equate backwards and they should all be equal
     if(changed && m_argCount > 2) {
-      for(unsigned int i = m_argCount - 2; i >= 1; i--) {
+      for(unsigned long i = m_argCount - 2; i >= 1; i--) {
 	ConstrainedVariableId v1 = m_variables[i];
 	ConstrainedVariableId v2 = m_variables[i-1];
 	bool isEmpty = false;
@@ -627,7 +507,7 @@ namespace EUROPA {
     }
   }
 
-  bool EqualConstraint::equate(const ConstrainedVariableId& v1, const ConstrainedVariableId& v2, bool& isEmpty){
+  bool EqualConstraint::equate(const ConstrainedVariableId v1, const ConstrainedVariableId v2, bool& isEmpty){
     checkError(isEmpty == false, "Should be initially false.");
     Domain& d1 = getCurrentDomain(v1);
     Domain& d2 = getCurrentDomain(v2);
@@ -679,14 +559,14 @@ namespace EUROPA {
     return changed;
   }
 
-  Domain& EqualConstraint::getCurrentDomain(const ConstrainedVariableId& var) {
+  Domain& EqualConstraint::getCurrentDomain(const ConstrainedVariableId var) {
     return(Constraint::getCurrentDomain(var));
   }
 
   /************ SubsetOfConstraint ******************/
-  SubsetOfConstraint::SubsetOfConstraint(const LabelStr& name,
-					 const LabelStr& propagatorName,
-					 const ConstraintEngineId& constraintEngine,
+  SubsetOfConstraint::SubsetOfConstraint(const std::string& name,
+					 const std::string& propagatorName,
+					 const ConstraintEngineId constraintEngine,
 					 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_currentDomain(getCurrentDomain(variables[0])),
@@ -701,27 +581,27 @@ namespace EUROPA {
     m_currentDomain.intersect(m_superSetDomain);
   }
 
-  bool SubsetOfConstraint::canIgnore(const ConstrainedVariableId& variable,
-				     int argIndex,
-				     const DomainListener::ChangeType& changeType){
-    // If not a relaxation, and if it is the first argument, then we can ignore it as it will already be a subset
-    if(changeType == DomainListener::RESET ||
-       changeType == DomainListener::RELAXED ||
-       argIndex == 1)
-      return false;
-    else
-      return true;
-  }
+bool SubsetOfConstraint::canIgnore(const ConstrainedVariableId,
+                                   unsigned int argIndex,
+                                   const DomainListener::ChangeType& changeType){
+  // If not a relaxation, and if it is the first argument, then we can ignore it as it will already be a subset
+  if(changeType == DomainListener::RESET ||
+     changeType == DomainListener::RELAXED ||
+     argIndex == 1)
+    return false;
+  else
+    return true;
+}
 
   /*********** LessThanEqualConstraint *************/
-  LessThanEqualConstraint::LessThanEqualConstraint(const LabelStr& name,
-						   const LabelStr& propagatorName,
-						   const ConstraintEngineId& constraintEngine,
+  LessThanEqualConstraint::LessThanEqualConstraint(const std::string& name,
+						   const std::string& propagatorName,
+						   const ConstraintEngineId constraintEngine,
 						   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_x(getCurrentDomain(variables[X])),
       m_y(getCurrentDomain(variables[Y])){
-    checkError(variables.size() == (unsigned int) ARG_COUNT, toString());
+    checkError(variables.size() == ARG_COUNT, toString());
     checkError(m_x.isNumeric(), variables[X]->toString());
     checkError(m_y.isNumeric(), variables[Y]->toString());
   }
@@ -751,35 +631,33 @@ namespace EUROPA {
     m_y.intersect(m_x.getLowerBound(), m_y.getUpperBound());
   }
 
-  bool LessThanEqualConstraint::canIgnore(const ConstrainedVariableId& variable,
-					  int argIndex,
-					  const DomainListener::ChangeType& changeType) {
-    return((argIndex == X &&
-	    (changeType == DomainListener::UPPER_BOUND_DECREASED)) ||
-	   (argIndex == Y &&
-	    (changeType == DomainListener::LOWER_BOUND_INCREASED)));
-  }
-  /**
-   * @todo
-   */
-  bool LessThanEqualConstraint::testIsRedundant(const ConstrainedVariableId& var) const{
-    if(Constraint::testIsRedundant(var))
-      return true;
+bool LessThanEqualConstraint::canIgnore(const ConstrainedVariableId,
+                                        unsigned int argIndex,
+                                        const DomainListener::ChangeType& changeType) {
+  return((argIndex == X &&
+          (changeType == DomainListener::UPPER_BOUND_DECREASED)) ||
+         (argIndex == Y &&
+          (changeType == DomainListener::LOWER_BOUND_INCREASED)));
+}
 
-    if(getScope()[X]->baseDomain().getUpperBound() <= getScope()[Y]->baseDomain().getLowerBound())
-      return true;
-
-    return false;
-  }
+bool LessThanEqualConstraint::testIsRedundant(const ConstrainedVariableId var) const{
+  if(Constraint::testIsRedundant(var))
+    return true;
+  
+  if(getScope()[X]->baseDomain().getUpperBound() <= getScope()[Y]->baseDomain().getLowerBound())
+    return true;
+  
+  return false;
+}
 
 
   /*********** NotEqualConstraint *************/
-  NotEqualConstraint::NotEqualConstraint(const LabelStr& name,
-					 const LabelStr& propagatorName,
-					 const ConstraintEngineId& constraintEngine,
+  NotEqualConstraint::NotEqualConstraint(const std::string& name,
+					 const std::string& propagatorName,
+					 const ConstraintEngineId constraintEngine,
 					 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
+    check_error(variables.size() == ARG_COUNT);
   }
 
   void NotEqualConstraint::handleExecute() {
@@ -833,28 +711,28 @@ namespace EUROPA {
     return(false);
   }
 
-  bool NotEqualConstraint::canIgnore(const ConstrainedVariableId& variable,
-				     int argIndex,
-				     const DomainListener::ChangeType& changeType) {
-    if(changeType==DomainListener::RESET || changeType == DomainListener::RELAXED)
-      return false;
+bool NotEqualConstraint::canIgnore(const ConstrainedVariableId variable,
+                                   unsigned int,
+                                   const DomainListener::ChangeType& changeType) {
+  if(changeType==DomainListener::RESET || changeType == DomainListener::RELAXED)
+    return false;
 
-    const Domain& domain = variable->lastDomain();
+  const Domain& domain = variable->lastDomain();
 
-    if(domain.isSingleton() ||
-       (domain.isInterval() && domain.isFinite() && domain.getSize() <=2 )) // Since this transition is key for propagation
-       return false;
+  if(domain.isSingleton() ||
+     (domain.isInterval() && domain.isFinite() && domain.getSize() <=2 )) // Since this transition is key for propagation
+    return false;
 
-    return true;
-  }
+  return true;
+}
 
   /*********** LessThanConstraint *************/
-  LessThanConstraint::LessThanConstraint(const LabelStr& name,
-                                         const LabelStr& propagatorName,
-                                         const ConstraintEngineId& constraintEngine,
+  LessThanConstraint::LessThanConstraint(const std::string& name,
+                                         const std::string& propagatorName,
+                                         const ConstraintEngineId constraintEngine,
                                          const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
+    check_error(variables.size() == ARG_COUNT);
   }
 
   void LessThanConstraint::handleExecute() {
@@ -894,71 +772,45 @@ namespace EUROPA {
     }
   }
 
-  bool LessThanConstraint::canIgnore(const ConstrainedVariableId& variable,
-				     int argIndex,
-				     const DomainListener::ChangeType& changeType) {
-    return((argIndex == X &&
-	    (changeType == DomainListener::UPPER_BOUND_DECREASED)) ||
-	   (argIndex == Y &&
-	    (changeType == DomainListener::LOWER_BOUND_INCREASED)));
-  }
-
-
-  /**
-   * @class AddMultEqualConstraint
-   * @brief A + (B*C) == D
-   */
-  AddMultEqualConstraint::AddMultEqualConstraint(const LabelStr& name,
-                                                 const LabelStr& propagatorName,
-                                                 const ConstraintEngineId& constraintEngine,
-                                                 const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_interimVariable(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_multEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine,
-			    makeScope(m_variables[B], m_variables[C], m_interimVariable.getId())),
-      m_addEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine,
-			   makeScope(m_interimVariable.getId(), m_variables[A], m_variables[D])) {
-    check_error(m_variables.size() == (unsigned int) ARG_COUNT);
-  }
-
-  AddMultEqualConstraint::~AddMultEqualConstraint(){
-    discard(false);
-  }
-
-  void AddMultEqualConstraint::handleDiscard(){
-    Constraint::handleDiscard();
-    m_interimVariable.discard();
-  }
+bool LessThanConstraint::canIgnore(const ConstrainedVariableId,
+                                   unsigned int argIndex,
+                                   const DomainListener::ChangeType& changeType) {
+  return((argIndex == X &&
+          (changeType == DomainListener::UPPER_BOUND_DECREASED)) ||
+         (argIndex == Y &&
+          (changeType == DomainListener::LOWER_BOUND_INCREASED)));
+}
 
   /*********** EqualSumConstraint *************/
-  EqualSumConstraint::EqualSumConstraint(const LabelStr& name,
-                                         const LabelStr& propagatorName,
-                                         const ConstraintEngineId& constraintEngine,
-                                         const std::vector<ConstrainedVariableId>& variables)
+EqualSumConstraint::EqualSumConstraint(const std::string& name,
+                                       const std::string& propagatorName,
+                                       const ConstraintEngineId constraintEngine,
+                                       const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       ARG_COUNT(variables.size()),
-      m_sum1(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqSumVariable"), getId()),
-      m_sum2(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqSumVariable"), getId()),
-      m_sum3(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqSumVariable"), getId()),
-      m_sum4(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqSumVariable"), getId()) {
-    check_error(ARG_COUNT > 2 && ARG_COUNT == (unsigned int)m_variables.size());
-    std::vector<ConstrainedVariableId> scope;
-    // B is always first and C is always second for the first set, so:
-    scope.push_back(m_variables[1]); // B + ...
-    scope.push_back(m_variables[2]); // ... C ...
-    switch (ARG_COUNT) {
+      m_eqSumC1(), m_eqSumC2(), m_eqSumC3(), m_eqSumC4(), m_eqSumC5(),
+      m_sum1(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqSumVariable"), getId()),
+      m_sum2(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqSumVariable"), getId()),
+      m_sum3(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqSumVariable"), getId()),
+      m_sum4(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqSumVariable"), getId()) {
+  check_error(ARG_COUNT > 2 && ARG_COUNT == m_variables.size());
+  std::vector<ConstrainedVariableId> scope;
+  // B is always first and C is always second for the first set, so:
+  scope.push_back(m_variables[1]); // B + ...
+  scope.push_back(m_variables[2]); // ... C ...
+  switch (ARG_COUNT) {
     case 3: // A = B + C
       scope.push_back(m_variables[0]); // ... = A
-      m_eqSumC1 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqSumC1 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
       break;
     case 4: // A = (B + C) + D
       scope.push_back(m_sum1.getId()); // ... = (B + C)
-      m_eqSumC1 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqSumC1 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_sum1.getId()); // (B + C) ...
       scope.push_back(m_variables[3]); // ... + D = ...
       scope.push_back(m_variables[0]); // ... A
-      m_eqSumC2 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqSumC2 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
       break;
     case 5: case 6: case 7:
       // 5: A = (B + C) + (D + E)
@@ -966,46 +818,46 @@ namespace EUROPA {
       // 7: A = (B + C) + (D + E + F + G)
       // So, do (B + C) and (D + E ...) for all three:
       scope.push_back(m_sum1.getId()); // (B + C)
-      m_eqSumC1 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqSumC1 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_sum1.getId()); // (B + C) + ...
       scope.push_back(m_sum2.getId()); // (D + E ...) = ...
       scope.push_back(m_variables[0]); // A
-      m_eqSumC2 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqSumC2 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_variables[3]); // D + ...
       scope.push_back(m_variables[4]); // E ...
       switch (ARG_COUNT) {
-      case 5:
-        scope.push_back(m_sum2.getId()); // ... = (D + E)
-        m_eqSumC3 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        break;
-      case 6:
-        scope.push_back(m_sum3.getId()); // ... = (D + E)
-        m_eqSumC3 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        scope.clear();
-        scope.push_back(m_sum3.getId()); // (D + E) + ...
-        scope.push_back(m_variables[5]); // ... F = ...
-        scope.push_back(m_sum2.getId()); // ... (D + E + F)
-        m_eqSumC4 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        break;
-      case 7:
-        scope.push_back(m_sum3.getId()); // ... = (D + E)
-        m_eqSumC3 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        scope.clear();
-        scope.push_back(m_sum3.getId()); // (D + E) + ...
-        scope.push_back(m_sum4.getId()); // ... (F + G) = ...
-        scope.push_back(m_sum2.getId()); // (D + E + F + G)
-        m_eqSumC4 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        scope.clear();
-        scope.push_back(m_variables[5]); // F + ...
-        scope.push_back(m_variables[6]); // ... G = ...
-        scope.push_back(m_sum4.getId()); // ... (F + G)
-        m_eqSumC5 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
-        break;
-      default:
-        check_error(ALWAYS_FAILS);
-        break;
+        case 5:
+          scope.push_back(m_sum2.getId()); // ... = (D + E)
+          m_eqSumC3 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          break;
+        case 6:
+          scope.push_back(m_sum3.getId()); // ... = (D + E)
+          m_eqSumC3 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          scope.clear();
+          scope.push_back(m_sum3.getId()); // (D + E) + ...
+          scope.push_back(m_variables[5]); // ... F = ...
+          scope.push_back(m_sum2.getId()); // ... (D + E + F)
+          m_eqSumC4 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          break;
+        case 7:
+          scope.push_back(m_sum3.getId()); // ... = (D + E)
+          m_eqSumC3 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          scope.clear();
+          scope.push_back(m_sum3.getId()); // (D + E) + ...
+          scope.push_back(m_sum4.getId()); // ... (F + G) = ...
+          scope.push_back(m_sum2.getId()); // (D + E + F + G)
+          m_eqSumC4 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          scope.clear();
+          scope.push_back(m_variables[5]); // F + ...
+          scope.push_back(m_variables[6]); // ... G = ...
+          scope.push_back(m_sum4.getId()); // ... (F + G)
+          m_eqSumC5 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+          break;
+        default:
+          check_error(ALWAYS_FAILS);
+          break;
       } // switch (ARGCOUNT) 5, 6, 7
       break;
     default:
@@ -1015,24 +867,23 @@ namespace EUROPA {
         scope.push_back(m_sum1.getId()); // first_half + ...
         scope.push_back(m_sum2.getId()); // ... second_half = ...
         scope.push_back(m_variables[0]); // ... A
-        m_eqSumC1 = (new AddEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqSumC1 = (new AddEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_sum1.getId()); // first_half = ...
-        unsigned int half = ARG_COUNT/2;
-        unsigned int i = 1;
+        unsigned long half = ARG_COUNT/2;
+        unsigned long i = 1;
         for ( ; i <= half; i++)
           scope.push_back(m_variables[i]); // ... X + ...
-        m_eqSumC2 = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName, constraintEngine, scope))->getId();
+        m_eqSumC2 = (new EqualSumConstraint(std::string("EqualSum"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_sum2.getId()); // second_half = ...
         for ( ; i < ARG_COUNT; i++)
           scope.push_back(m_variables[i]); // ... Y + ...
-        m_eqSumC3 = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName, constraintEngine, scope))->getId();
+        m_eqSumC3 = (new EqualSumConstraint(std::string("EqualSum"), propagatorName, constraintEngine, scope))->getId();
         break;
       }
-      break;
-    }
   }
+}
 
   EqualSumConstraint::~EqualSumConstraint() {
     discard(false);
@@ -1050,17 +901,18 @@ namespace EUROPA {
   }
 
   /*********** EqualProductConstraint *************/
-  EqualProductConstraint::EqualProductConstraint(const LabelStr& name,
-                                                 const LabelStr& propagatorName,
-                                                 const ConstraintEngineId& constraintEngine,
+  EqualProductConstraint::EqualProductConstraint(const std::string& name,
+                                                 const std::string& propagatorName,
+                                                 const ConstraintEngineId constraintEngine,
                                                  const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       ARG_COUNT(variables.size()),
-      m_product1(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqProductVariable"), getId()),
-      m_product2(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqProductVariable"), getId()),
-      m_product3(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqProductVariable"), getId()),
-      m_product4(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalEqProductVariable"), getId()) {
-    check_error(ARG_COUNT > 2 && ARG_COUNT == (unsigned int)m_variables.size());
+      m_eqProductC1(), m_eqProductC2(), m_eqProductC3(), m_eqProductC4(), m_eqProductC5(),
+      m_product1(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqProductVariable"), getId()),
+      m_product2(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqProductVariable"), getId()),
+      m_product3(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqProductVariable"), getId()),
+      m_product4(constraintEngine, IntervalDomain(), true, false, std::string("InternalEqProductVariable"), getId()) {
+    check_error(ARG_COUNT > 2 && ARG_COUNT == m_variables.size());
     std::vector<ConstrainedVariableId> scope;
     // B is always first and C is always second for the first set, so:
     scope.push_back(m_variables[1]); // B * ...
@@ -1068,16 +920,16 @@ namespace EUROPA {
     switch (ARG_COUNT) {
     case 3: // A = B * C
       scope.push_back(m_variables[0]); // ... = A
-      m_eqProductC1 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqProductC1 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
       break;
     case 4: // A = (B * C) * D
       scope.push_back(m_product1.getId()); // ... = (B * C)
-      m_eqProductC1 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqProductC1 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_product1.getId()); // (B * C) ...
       scope.push_back(m_variables[3]); // ... * D = ...
       scope.push_back(m_variables[0]); // ... A
-      m_eqProductC2 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqProductC2 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
       break;
     case 5: case 6: case 7:
       // 5: A = (B * C) * (D * E)
@@ -1085,42 +937,42 @@ namespace EUROPA {
       // 7: A = (B * C) * (D * E * F * G)
       // So, do (B * C) and (D * E ...) for all three:
       scope.push_back(m_product1.getId()); // (B * C)
-      m_eqProductC1 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqProductC1 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_product1.getId()); // (B * C) * ...
       scope.push_back(m_product2.getId()); // (D * E ...) = ...
       scope.push_back(m_variables[0]); // A
-      m_eqProductC2 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+      m_eqProductC2 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
       scope.clear();
       scope.push_back(m_variables[3]); // D * ...
       scope.push_back(m_variables[4]); // E ...
       switch (ARG_COUNT) {
       case 5:
         scope.push_back(m_product2.getId()); // ... = (D * E)
-        m_eqProductC3 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC3 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         break;
       case 6:
         scope.push_back(m_product3.getId()); // ... = (D * E)
-        m_eqProductC3 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC3 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_product3.getId()); // (D * E) * ...
         scope.push_back(m_variables[5]); // ... F = ...
         scope.push_back(m_product2.getId()); // ... (D * E * F)
-        m_eqProductC4 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC4 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         break;
       case 7:
         scope.push_back(m_product3.getId()); // ... = (D * E)
-        m_eqProductC3 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC3 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_product3.getId()); // (D * E) * ...
         scope.push_back(m_product4.getId()); // ... (F * G) = ...
         scope.push_back(m_product2.getId()); // (D * E * F * G)
-        m_eqProductC4 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC4 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_variables[5]); // F * ...
         scope.push_back(m_variables[6]); // ... G = ...
         scope.push_back(m_product4.getId()); // ... (F * G)
-        m_eqProductC5 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC5 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         break;
       default:
         check_error(ALWAYS_FAILS);
@@ -1134,22 +986,21 @@ namespace EUROPA {
         scope.push_back(m_product1.getId()); // first_half * ...
         scope.push_back(m_product2.getId()); // ... second_half = ...
         scope.push_back(m_variables[0]); // ... A
-        m_eqProductC1 = (new MultEqualConstraint(LabelStr("MultEqual"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC1 = (new MultEqualConstraint(std::string("MultEqual"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_product1.getId()); // first_half = ...
-        unsigned int half = ARG_COUNT/2;
-        unsigned int i = 1;
+        unsigned long half = ARG_COUNT/2;
+        unsigned long i = 1;
         for ( ; i <= half; i++)
           scope.push_back(m_variables[i]); // ... X * ...
-        m_eqProductC2 = (new EqualProductConstraint(LabelStr("EqualProduct"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC2 = (new EqualProductConstraint(std::string("EqualProduct"), propagatorName, constraintEngine, scope))->getId();
         scope.clear();
         scope.push_back(m_product2.getId()); // second_half = ...
         for ( ; i < ARG_COUNT; i++)
           scope.push_back(m_variables[i]); // ... Y * ...
-        m_eqProductC3 = (new EqualProductConstraint(LabelStr("EqualProduct"), propagatorName, constraintEngine, scope))->getId();
+        m_eqProductC3 = (new EqualProductConstraint(std::string("EqualProduct"), propagatorName, constraintEngine, scope))->getId();
         break;
       }
-      break;
     }
   }
 
@@ -1168,88 +1019,10 @@ namespace EUROPA {
     m_product4.discard();
   }
 
-  /*********** LessOrEqualThanSumConstraint *************/
-  LessOrEqThanSumConstraint::LessOrEqThanSumConstraint(const LabelStr& name,
-                                                       const LabelStr& propagatorName,
-                                                       const ConstraintEngineId& constraintEngine,
-                                                       const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_interimVariable(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_lessOrEqualConstraint(LabelStr("LessThanEq"), propagatorName, constraintEngine,
-                              makeScope(m_variables[0], m_interimVariable.getId())) {
-    std::vector<ConstrainedVariableId> eqSumScope = m_variables;
-    eqSumScope[0] = m_interimVariable.getId();
-    m_eqSumConstraint = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName,
-                                                constraintEngine, eqSumScope))->getId();
-  }
-
-  LessOrEqThanSumConstraint::~LessOrEqThanSumConstraint(){
-    discard(false);
-  }
-
-  void LessOrEqThanSumConstraint::handleExecute(){}
-
-  void LessOrEqThanSumConstraint::handleDiscard(){
-    Constraint::handleDiscard();
-
-    // Discarding the variable will discard the constraints
-    m_interimVariable.discard();
-  }
-
-
-  /*********** LessThanSumConstraint *************/
-  LessThanSumConstraint::LessThanSumConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
-                                               const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_interimVariable(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_lessThanConstraint(LabelStr("LessThan"), propagatorName, constraintEngine,
-                           makeScope(m_variables[0], m_interimVariable.getId())) {
-    std::vector<ConstrainedVariableId> eqSumScope = m_variables;
-    eqSumScope[0] = m_interimVariable.getId();
-    m_eqSumConstraint = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName,
-                                                constraintEngine, eqSumScope))->getId();
-    check_error(m_eqSumConstraint.isValid());
-  }
-
-  /*********** GreaterOrEqThanSumConstraint *************/
-  GreaterOrEqThanSumConstraint::GreaterOrEqThanSumConstraint(const LabelStr& name,
-                                                       const LabelStr& propagatorName,
-                                                       const ConstraintEngineId& constraintEngine,
-                                                       const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_interimVariable(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_lessOrEqualConstraint(LabelStr("LessThanEqual"), propagatorName, constraintEngine,
-                              makeScope(m_interimVariable.getId(), m_variables[0])) {
-    std::vector<ConstrainedVariableId> eqSumScope = m_variables;
-    eqSumScope[0] = m_interimVariable.getId();
-    m_eqSumConstraint = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName,
-                                                constraintEngine, eqSumScope))->getId();
-  }
-
-  /*********** GreaterThanSumConstraint *************/
-  GreaterThanSumConstraint::GreaterThanSumConstraint(const LabelStr& name,
-                                                     const LabelStr& propagatorName,
-                                                     const ConstraintEngineId& constraintEngine,
-                                                     const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_interimVariable(constraintEngine, constraintEngine->getCESchema()->baseDomain(m_variables[0]->baseDomain().getTypeName().c_str()),
-			true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_lessThanConstraint(LabelStr("LessThan"), propagatorName, constraintEngine,
-                           makeScope(m_interimVariable.getId(), m_variables[0]))
-  {
-    std::vector<ConstrainedVariableId> eqSumScope = m_variables;
-    eqSumScope[0] = m_interimVariable.getId();
-    m_eqSumConstraint = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName,
-                                                constraintEngine, eqSumScope))->getId();
-    check_error(m_eqSumConstraint.isValid());
-  }
-
   /*********** CondAllSameConstraint *************/
-  CondAllSameConstraint::CondAllSameConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
+  CondAllSameConstraint::CondAllSameConstraint(const std::string& name,
+                                               const std::string& propagatorName,
+                                               const ConstraintEngineId constraintEngine,
                                                const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       ARG_COUNT(variables.size()) {
@@ -1370,8 +1143,7 @@ namespace EUROPA {
                 && (domj.isMember(domToTrim.getLowerBound())
                     || domj.isMember(domToTrim.getUpperBound()))))
           domToTrim.remove(single);
-        else
-          ; // Can ignore relax events until condition var is relaxed.
+        else {} // Can ignore relax events until condition var is relaxed.
         return;
       } else {
 
@@ -1397,9 +1169,9 @@ namespace EUROPA {
 
 
   /*********** CondAllDiffConstraint *************/
-  CondAllDiffConstraint::CondAllDiffConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
+  CondAllDiffConstraint::CondAllDiffConstraint(const std::string& name,
+                                               const std::string& propagatorName,
+                                               const ConstraintEngineId constraintEngine,
                                                const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       ARG_COUNT(variables.size()) {
@@ -1410,6 +1182,7 @@ namespace EUROPA {
                                                 getCurrentDomain(m_variables[i])));
   }
 
+namespace {
   /**
    * @brief Helper function: add domToAdd to unionOfDomains "usefully".
    * Adds all of the members of domToAdd and, if needed and useful,
@@ -1424,79 +1197,80 @@ namespace EUROPA {
    * simply returning a single larger interval that 'covers' both
    * original intervals.
    */
-  static void addToUnion(Domain **unionOfDomains,
-                         const Domain& domToAdd) {
-    check_error(unionOfDomains != 0 && *unionOfDomains != 0);
-    check_error(!(*unionOfDomains)->isEmpty() && !(*unionOfDomains)->isOpen());
-    check_error(!domToAdd.isEmpty() && !domToAdd.isOpen());
-    Domain *newUnion = 0;
-    std::list<edouble> membersToAdd;
-    std::list<edouble> newMembers;
-    if (((*unionOfDomains)->isEnumerated() || (*unionOfDomains)->isSingleton())
-        && (domToAdd.isEnumerated() || domToAdd.isSingleton())) {
-      if (domToAdd.isEnumerated())
-        domToAdd.getValues(membersToAdd);
-      else
-        membersToAdd.push_back(domToAdd.getSingletonValue());
-      if ((*unionOfDomains)->isEnumerated())
-        (*unionOfDomains)->getValues(newMembers);
-      else
-        newMembers.push_back((*unionOfDomains)->getSingletonValue());
-      for (std::list<edouble>::const_iterator it = membersToAdd.begin();
-           it != membersToAdd.end(); it++) {
-        std::list<edouble>::const_iterator it2 = newMembers.begin();
-        for ( ; it2 != newMembers.end(); it2++)
-          if (*it == *it2)
-            break;
-        if (it2 == newMembers.end())
-          newMembers.push_back(*it);
-      }
-      newUnion = new EnumeratedDomain(
-              (*unionOfDomains)->getDataType(),
-              newMembers);
+void addToUnion(Domain **unionOfDomains,
+                const Domain& domToAdd) {
+  check_error(unionOfDomains != 0 && *unionOfDomains != 0);
+  check_error(!(*unionOfDomains)->isEmpty() && !(*unionOfDomains)->isOpen());
+  check_error(!domToAdd.isEmpty() && !domToAdd.isOpen());
+  Domain *newUnion = 0;
+  std::list<edouble> membersToAdd;
+  std::list<edouble> newMembers;
+  if (((*unionOfDomains)->isEnumerated() || (*unionOfDomains)->isSingleton())
+      && (domToAdd.isEnumerated() || domToAdd.isSingleton())) {
+    if (domToAdd.isEnumerated())
+      domToAdd.getValues(membersToAdd);
+    else
+      membersToAdd.push_back(domToAdd.getSingletonValue());
+    if ((*unionOfDomains)->isEnumerated())
+      (*unionOfDomains)->getValues(newMembers);
+    else
+      newMembers.push_back((*unionOfDomains)->getSingletonValue());
+    for (std::list<edouble>::const_iterator it = membersToAdd.begin();
+         it != membersToAdd.end(); it++) {
+      std::list<edouble>::const_iterator it2 = newMembers.begin();
+      for ( ; it2 != newMembers.end(); it2++)
+        if (*it == *it2)
+          break;
+      if (it2 == newMembers.end())
+        newMembers.push_back(*it);
+    }
+    newUnion = new EnumeratedDomain(
+        (*unionOfDomains)->getDataType(),
+        newMembers);
 
-      // Could just add to current unionOfDomains rather than failing here, but
-      //   very messy to implement using current interface to *Domain classes.
-      assertFalse(newUnion == 0);
-      delete *unionOfDomains;
-      *unionOfDomains = newUnion;
-      return;
-    }
-    // At least one is a non-singleton interval, so the result will be
-    //   also be one.
-    edouble toAddMin, toAddMax, newMin, newMax;
-    domToAdd.getBounds(toAddMin, toAddMax);
-    (*unionOfDomains)->getBounds(newMin, newMax);
-    bool changing = false;
-    if (toAddMin < newMin) {
-      newMin = toAddMin;
-      changing = true;
-    }
-    if (newMax < toAddMax) {
-      newMax = toAddMax;
-      changing = true;
-    }
-    if (changing) {
-      if((*unionOfDomains)->minDelta() < 1.0)
-        newUnion = new IntervalDomain(newMin, newMax);
-      else
-        newUnion = new IntervalIntDomain((eint)newMin, (eint)newMax);
-
-      /* BOOL should be not get to here since both are non-singleton
-       *   but then unionOfDomains "covers" domToAdd and changing
-       *   would be false.
-       * USER_DEFINED and REAL_ENUMERATION should not get to here
-       *   since enumerations are dealt with above.
-       * As above, a memory failure here could be dealt with, but
-       *   messy to implement, but note that this also checks the
-       *   assumptions/logic earlier in this comment.
-       */
-      checkError(newUnion != 0, "Failed to allocate memory.");
-      delete *unionOfDomains;
-      *unionOfDomains = newUnion;
-      return;
-    }
+    // Could just add to current unionOfDomains rather than failing here, but
+    //   very messy to implement using current interface to *Domain classes.
+    assertFalse(newUnion == NULL);
+    delete *unionOfDomains;
+    *unionOfDomains = newUnion;
+    return;
   }
+  // At least one is a non-singleton interval, so the result will be
+  //   also be one.
+  edouble toAddMin, toAddMax, newMin, newMax;
+  domToAdd.getBounds(toAddMin, toAddMax);
+  (*unionOfDomains)->getBounds(newMin, newMax);
+  bool changing = false;
+  if (toAddMin < newMin) {
+    newMin = toAddMin;
+    changing = true;
+  }
+  if (newMax < toAddMax) {
+    newMax = toAddMax;
+    changing = true;
+  }
+  if (changing) {
+    if((*unionOfDomains)->minDelta() < 1.0)
+      newUnion = new IntervalDomain(newMin, newMax);
+    else
+      newUnion = new IntervalIntDomain(static_cast<eint>(newMin), static_cast<eint>(newMax));
+
+    /* BOOL should be not get to here since both are non-singleton
+     *   but then unionOfDomains "covers" domToAdd and changing
+     *   would be false.
+     * USER_DEFINED and REAL_ENUMERATION should not get to here
+     *   since enumerations are dealt with above.
+     * As above, a memory failure here could be dealt with, but
+     *   messy to implement, but note that this also checks the
+     *   assumptions/logic earlier in this comment.
+     */
+    checkError(newUnion != 0, "Failed to allocate memory.");
+    delete *unionOfDomains;
+    *unionOfDomains = newUnion;
+    return;
+  }
+}
+}
 
   void CondAllDiffConstraint::handleExecute() {
     BoolDomain& boolDom = static_cast<BoolDomain&>(getCurrentDomain(m_variables[0]));
@@ -1539,7 +1313,7 @@ namespace EUROPA {
           canProveTrue = false;
         // Add members of current to unionOfOthers "usefully".
         addToUnion(&unionOfOthers, current);
-        if (unionOfOthers->isFinite() && (unsigned int)(unionOfOthers->getSize()) < i) {
+        if (unionOfOthers->isFinite() && (unionOfOthers->getSize()) < i) {
           // At least two of the variables must have same value.
           boolDom.remove(true);
           canProveTrue = false;
@@ -1627,25 +1401,25 @@ namespace EUROPA {
     } // for changedOne = true; changedOne;
   } // end of CondAllDiffConstraint::handleExecute()
 
-  AllDiffConstraint::AllDiffConstraint(const LabelStr& name,
-                                       const LabelStr& propagatorName,
-                                       const ConstraintEngineId& constraintEngine,
-                                       const std::vector<ConstrainedVariableId>& variables)
+AllDiffConstraint::AllDiffConstraint(const std::string& name,
+                                     const std::string& propagatorName,
+                                     const ConstraintEngineId constraintEngine,
+                                     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
-      m_condVar(constraintEngine, BoolDomain(true), true, false, LabelStr("Internal:AllDiff:cond"), getId())
-  {
+      m_condVar(constraintEngine, BoolDomain(true), true, false, std::string("Internal:AllDiff:cond"), getId()),
+      m_condAllDiffConstraint() {
     std::vector<ConstrainedVariableId> condAllDiffScope;
     condAllDiffScope.reserve(m_variables.size() + 1);
     condAllDiffScope.push_back(m_condVar.getId());
     condAllDiffScope.insert(condAllDiffScope.end(), m_variables.begin(), m_variables.end());
     check_error(m_variables.size() + 1 == condAllDiffScope.size());
-    m_condAllDiffConstraint = (new CondAllDiffConstraint(LabelStr("CondAllDiff"), propagatorName,
+    m_condAllDiffConstraint = (new CondAllDiffConstraint(std::string("CondAllDiff"), propagatorName,
                                                          constraintEngine, condAllDiffScope))->getId();
   }
 
-  MemberImplyConstraint::MemberImplyConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
+  MemberImplyConstraint::MemberImplyConstraint(const std::string& name,
+                                               const std::string& propagatorName,
+                                               const ConstraintEngineId constraintEngine,
                                                const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       ARG_COUNT(variables.size()) {
@@ -1672,38 +1446,38 @@ namespace EUROPA {
       (void) domA.intersect(domD);
   }
 
-  CountZerosConstraint::CountZerosConstraint(const LabelStr& name,
-                                             const LabelStr& propagatorName,
-                                             const ConstraintEngineId& constraintEngine,
+  CountZeroesConstraint::CountZeroesConstraint(const std::string& name,
+                                             const std::string& propagatorName,
+                                             const ConstraintEngineId constraintEngine,
                                              const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
     for (unsigned int i = 0; i < m_variables.size(); i++)
       check_error(getCurrentDomain(m_variables[i]).isNumeric() || getCurrentDomain(m_variables[i]).isBool());
   }
 
-  void CountZerosConstraint::handleExecute() {
+  void CountZeroesConstraint::handleExecute() {
     unsigned int i = 1;
 
     // Count the other vars that must be zero ...
-    unsigned int minZeros = 0;
+    unsigned int minZeroes = 0;
     // ... and that could be zero.
-    unsigned int maxZeros = 0;
+    unsigned int maxZeroes = 0;
     for ( ; i < m_variables.size(); i++) {
       Domain& other = getCurrentDomain(m_variables[i]);
       if (other.isMember(0.0)) {
-        ++maxZeros;
+        ++maxZeroes;
         if (other.isSingleton())
-          ++minZeros;
+          ++minZeroes;
       }
     }
 
-    // The count of zeros is the first variable.
+    // The count of zeroes is the first variable.
     Domain& countDom = getCurrentDomain(m_variables[0]);
 
     // If all that could be zero must be zero to get the count high
     // enough, set all that could be zero to zero.
-    if (minZeros < countDom.getLowerBound() &&
-        maxZeros == countDom.getLowerBound()) {
+    if (minZeroes < countDom.getLowerBound() &&
+        maxZeroes == countDom.getLowerBound()) {
       // Find those that could be zero but might not be
       // and restrict them to 0.
       for (i = 1; i < m_variables.size(); i++) {
@@ -1720,8 +1494,8 @@ namespace EUROPA {
     // If all that might be zero are needed to be non-zero to get the
     // count low enough, restrict all that might be zero to not be
     // zero.
-    if (maxZeros > countDom.getUpperBound() &&
-        minZeros == countDom.getUpperBound()) {
+    if (maxZeroes > countDom.getUpperBound() &&
+        minZeroes == countDom.getUpperBound()) {
       // Find those that could be zero but might not be and restrict
       // them to not be 0.
       for (i = 1; i < m_variables.size(); i++) {
@@ -1744,69 +1518,55 @@ namespace EUROPA {
     }
 
     // If the counts seen restrict the count variable, do so.
-    if (minZeros > countDom.getLowerBound() ||
-        countDom.getUpperBound() > maxZeros)
-      countDom.intersect(make_int_int(minZeros, maxZeros));
+    if (minZeroes > countDom.getLowerBound() ||
+        countDom.getUpperBound() > maxZeroes)
+      countDom.intersect(make_int_int(minZeroes, maxZeroes));
   }
 
-  CountNonZerosConstraint::CountNonZerosConstraint(const LabelStr& name,
-                                                   const LabelStr& propagatorName,
-                                                   const ConstraintEngineId& constraintEngine,
-                                                   const std::vector<ConstrainedVariableId>& variables)
+CountNonZeroesConstraint::CountNonZeroesConstraint(const std::string& name,
+                                                 const std::string& propagatorName,
+                                                 const ConstraintEngineId constraintEngine,
+                                                 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
-      m_zeros(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalCountNonZerosVar"), getId()),
-      m_otherVars(constraintEngine, IntervalDomain(), true, false, LabelStr("InternalCountNonZerosOtherVars"), getId()),
-      m_superset(constraintEngine, IntervalDomain((edouble)(variables.size() - 1)), true, false, LabelStr("InternalCountNonZerosSuperset"), getId()),
-      m_addEqualConstraint(LabelStr("AddEqual"), propagatorName, constraintEngine,
-                           makeScope(m_zeros.getId(), m_variables[0], m_otherVars.getId()))
-  {
-    m_subsetConstraint = (new SubsetOfConstraint(LabelStr("SubsetOf"), propagatorName, constraintEngine,
-                                                 makeScope(m_otherVars.getId(), m_superset.getId())))->getId();
-    std::vector<ConstrainedVariableId> cZCScope = m_variables;
-    cZCScope[0] = m_zeros.getId();
-    check_error(m_variables.size() == cZCScope.size());
-    m_countZerosConstraint = (new CountZerosConstraint(LabelStr("CountZeros"),
-                                                       propagatorName, constraintEngine, cZCScope))->getId();
-  }
+      m_zeroes(constraintEngine, IntervalDomain(), true, false, std::string("InternalCountNonZeroesVar"), getId()),
+      m_otherVars(constraintEngine, IntervalDomain(), true, false, std::string("InternalCountNonZeroesOtherVars"), getId()),
+    m_superset(constraintEngine, IntervalDomain(edouble(variables.size() - 1)), true, false, std::string("InternalCountNonZeroesSuperset"), getId()),
+    m_addEqualConstraint(std::string("AddEqual"), propagatorName, constraintEngine,
+                         makeScope(m_zeroes.getId(), m_variables[0], m_otherVars.getId())),
+    m_subsetConstraint(), m_countZeroesConstraint() {
+  m_subsetConstraint = (new SubsetOfConstraint(std::string("SubsetOf"), propagatorName, constraintEngine,
+                                               makeScope(m_otherVars.getId(), m_superset.getId())))->getId();
+  std::vector<ConstrainedVariableId> cZCScope = m_variables;
+  cZCScope[0] = m_zeroes.getId();
+  check_error(m_variables.size() == cZCScope.size());
+  m_countZeroesConstraint = (new CountZeroesConstraint(std::string("CountZeroes"),
+                                                     propagatorName, constraintEngine, cZCScope))->getId();
+}
 
-  CardinalityConstraint::CardinalityConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
-                                               const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_nonZeros(constraintEngine, IntervalIntDomain(0, PLUS_INFINITY), true, false, LabelStr("InternalCardinalityVar"), getId()),
-      m_lessThanEqualConstraint(LabelStr("LessThanEqual"), propagatorName,
-                                constraintEngine, makeScope(m_nonZeros.getId(), m_variables[0]))
-  {
-    std::vector<ConstrainedVariableId> cCScope = m_variables;
-    cCScope[0] = m_nonZeros.getId();
-    check_error(m_variables.size() == cCScope.size());
-    m_countNonZerosConstraint = (new CountNonZerosConstraint(LabelStr("CountNonZeros"),
-                                                             propagatorName, constraintEngine, cCScope))->getId();
-  }
 
-  OrConstraint::OrConstraint(const LabelStr& name,
-                             const LabelStr& propagatorName,
-                             const ConstraintEngineId& constraintEngine,
+  OrConstraint::OrConstraint(const std::string& name,
+                             const std::string& propagatorName,
+                             const ConstraintEngineId constraintEngine,
                              const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
-      m_nonZeros(constraintEngine, IntervalIntDomain(1, PLUS_INFINITY), true, false, LabelStr("InternalVar:Or:nonZeros"), getId()),
-      m_superset(constraintEngine, IntervalIntDomain(1, eint(variables.size())), true, false, LabelStr("InternalVar:Or:superset"), getId())
+      m_nonZeroes(constraintEngine, IntervalIntDomain(1, PLUS_INFINITY), true, false, std::string("InternalVar:Or:nonZeroes"), getId()),
+      m_superset(constraintEngine, IntervalIntDomain(1, eint(variables.size())), true, false, std::string("InternalVar:Or:superset"), getId()),
+                     m_subsetConstraint(), m_countNonZeroesConstraint()
   {
-    m_subsetConstraint = (new SubsetOfConstraint(LabelStr("SubsetOf"), propagatorName, constraintEngine,
-                                                 makeScope(m_nonZeros.getId(), m_superset.getId())))->getId();
+    m_subsetConstraint = (new SubsetOfConstraint(std::string("SubsetOf"), propagatorName, constraintEngine,
+                                                 makeScope(m_nonZeroes.getId(), m_superset.getId())))->getId();
     std::vector<ConstrainedVariableId> cNZCScope;
     cNZCScope.reserve(m_variables.size() + 1);
-    cNZCScope.push_back(m_nonZeros.getId());
+    cNZCScope.push_back(m_nonZeroes.getId());
     cNZCScope.insert(cNZCScope.end(), m_variables.begin(), m_variables.end());
     check_error(m_variables.size() + 1 == cNZCScope.size());
-    m_countNonZerosConstraint = (new CountNonZerosConstraint(LabelStr("CountNonZeros"), propagatorName,
+    m_countNonZeroesConstraint = (new CountNonZeroesConstraint(std::string("CountNonZeroes"), propagatorName,
                                                              constraintEngine, cNZCScope))->getId();
   }
 
-  EqualMinimumConstraint::EqualMinimumConstraint(const LabelStr& name,
-                                                 const LabelStr& propagatorName,
-                                                 const ConstraintEngineId& constraintEngine,
+  EqualMinimumConstraint::EqualMinimumConstraint(const std::string& name,
+                                                 const std::string& propagatorName,
+                                                 const ConstraintEngineId constraintEngine,
                                                  const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
     check_error(m_variables.size() > 1);
@@ -1888,9 +1648,9 @@ namespace EUROPA {
     }
   }
 
-  EqualMaximumConstraint::EqualMaximumConstraint(const LabelStr& name,
-                                                 const LabelStr& propagatorName,
-                                                 const ConstraintEngineId& constraintEngine,
+  EqualMaximumConstraint::EqualMaximumConstraint(const std::string& name,
+                                                 const std::string& propagatorName,
+                                                 const ConstraintEngineId constraintEngine,
                                                  const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
     check_error(m_variables.size() > 1);
@@ -1972,83 +1732,67 @@ namespace EUROPA {
     }
   }
 
-  CondEqualSumConstraint::CondEqualSumConstraint(const LabelStr& name,
-                                                 const LabelStr& propagatorName,
-                                                 const ConstraintEngineId& constraintEngine,
-                                                 const std::vector<ConstrainedVariableId>& variables)
-    : Constraint(name, propagatorName, constraintEngine, variables),
-      m_sumVar(constraintEngine, constraintEngine->getCESchema()->baseDomain(m_variables[1]->baseDomain().getTypeName().c_str()),
-	       true, false, LabelStr("InternalConstraintVariable"), getId()),
-      m_condAllSameConstraint(LabelStr("CondAllSame"), propagatorName, constraintEngine,
-                              makeScope(m_variables[0], m_variables[1], m_sumVar.getId()))
-  {
-    check_error(m_variables.size() > 2);
-    std::vector<ConstrainedVariableId> eqSumScope;
-    eqSumScope.reserve(m_variables.size() - 1);
-    eqSumScope.push_back(m_sumVar.getId());
-    std::vector<ConstrainedVariableId>::iterator it = m_variables.begin();
-    ++it; ++it;
-    eqSumScope.insert(eqSumScope.end(), it, m_variables.end());
-    check_error(m_variables.size() - 1 == eqSumScope.size());
-    m_eqSumConstraint = (new EqualSumConstraint(LabelStr("EqualSum"), propagatorName,
-                                                constraintEngine, eqSumScope))->getId();
-    check_error(m_eqSumConstraint.isValid());
-  }
 
-  RotateScopeRightConstraint::RotateScopeRightConstraint(const LabelStr& name,
-                                                         const LabelStr& propagatorName,
-                                                         const ConstraintEngineId& constraintEngine,
-                                                         const std::vector<ConstrainedVariableId>& variables,
-                                                         const LabelStr& otherName,
-                                                         const int& rotateCount)
-    : Constraint(name, propagatorName, constraintEngine, variables)
+RotateScopeRightConstraint::RotateScopeRightConstraint(const std::string& name,
+                                                       const std::string& propagatorName,
+                                                       const ConstraintEngineId constraintEngine,
+                                                       const std::vector<ConstrainedVariableId>& variables,
+                                                       const std::string& otherName,
+                                                       const int& rotateCount)
+    : Constraint(name, propagatorName, constraintEngine, variables), m_otherConstraint()
   {
-    check_error((unsigned) abs(rotateCount) < m_variables.size());
+    check_error(static_cast<unsigned>(abs(rotateCount)) < m_variables.size());
     std::vector<ConstrainedVariableId> otherScope;
     otherScope.reserve(m_variables.size());
-    unsigned int i;
+
+    unsigned long i;
     if (rotateCount > 0) {
+      unsigned long realCount = static_cast<unsigned long>(rotateCount);
       // Rotate to right: last var becomes first, pushing others to the right.
-      for (i = rotateCount; i > 0; i--)
+      for (i = realCount; i > 0; i--)
         otherScope.push_back(m_variables[m_variables.size() - i]);
-      for (i = 0; i < m_variables.size() - rotateCount; i++)
+      for (i = 0; i < m_variables.size() - realCount; i++)
         otherScope.push_back(m_variables[i]);
-    } else {
+    }
+    else {
       // Rotate to left: first var becomes last, pushing others to the left.
-      for (i = (unsigned) abs(rotateCount); i < m_variables.size(); i++)
+      for (i = static_cast<unsigned>(abs(rotateCount)); i < m_variables.size(); i++)
         otherScope.push_back(m_variables[i]);
-      for (i = 0; i < (unsigned) abs(rotateCount); i++)
+      for (i = 0; i < static_cast<unsigned>(abs(rotateCount)); i++)
         otherScope.push_back(m_variables[i]);
     }
     check_error(m_variables.size() == otherScope.size());
     m_otherConstraint = constraintEngine->createConstraint(otherName, otherScope);
   }
 
-  SwapTwoVarsConstraint::SwapTwoVarsConstraint(const LabelStr& name,
-                                               const LabelStr& propagatorName,
-                                               const ConstraintEngineId& constraintEngine,
-                                               const std::vector<ConstrainedVariableId>& variables,
-                                               const LabelStr& otherName,
-                                               int firstIndex, int secondIndex)
-    : Constraint(name, propagatorName, constraintEngine, variables)
+SwapTwoVarsConstraint::SwapTwoVarsConstraint(const std::string& name,
+                                             const std::string& propagatorName,
+                                             const ConstraintEngineId constraintEngine,
+                                             const std::vector<ConstrainedVariableId>& variables,
+                                             const std::string& otherName,
+                                             int firstIndex, int secondIndex)
+    : Constraint(name, propagatorName, constraintEngine, variables), m_otherConstraint()
   {
-    check_error((unsigned) abs(firstIndex) < m_variables.size());
-    check_error((unsigned) abs(secondIndex) < m_variables.size());
+    check_error(static_cast<unsigned>(abs(firstIndex)) < m_variables.size());
+    check_error(static_cast<unsigned>(abs(secondIndex)) < m_variables.size());
     check_error(firstIndex != secondIndex);
-    if (firstIndex < 0)
-      firstIndex = m_variables.size() - firstIndex;
-    if (secondIndex < 0)
-      secondIndex = m_variables.size() - secondIndex;
+    unsigned long realFirstIndex = (firstIndex < 0 ?
+                                    (m_variables.size() - static_cast<unsigned long>(std::abs(firstIndex))) :
+                                    static_cast<unsigned long>(firstIndex));
+    unsigned long realSecondIndex = (secondIndex < 0 ?
+                                     (m_variables.size() - static_cast<unsigned long>(std::abs(secondIndex))) :
+                                     static_cast<unsigned long>(secondIndex));
+    check_error(realFirstIndex != realSecondIndex);
     std::vector<ConstrainedVariableId> otherScope(m_variables);
-    otherScope[firstIndex] = m_variables[secondIndex];
-    otherScope[secondIndex] = m_variables[firstIndex];
+    otherScope[realFirstIndex] = m_variables[realSecondIndex];
+    otherScope[realSecondIndex] = m_variables[realFirstIndex];
     m_otherConstraint = constraintEngine->createConstraint(otherName, otherScope);
   }
 
 
-  LockConstraint::LockConstraint(const LabelStr& name,
-				 const LabelStr& propagatorName,
-				 const ConstraintEngineId& constraintEngine,
+  LockConstraint::LockConstraint(const std::string& name,
+				 const std::string& propagatorName,
+				 const ConstraintEngineId constraintEngine,
 				 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_currentDomain(getCurrentDomain(variables[0])),
@@ -2078,9 +1822,9 @@ namespace EUROPA {
   }
 
   // Enforces X >=0, Y<=0, X+Y==0
-  NegateConstraint::NegateConstraint(const LabelStr& name,
-				   const LabelStr& propagatorName,
-				   const ConstraintEngineId& constraintEngine,
+  NegateConstraint::NegateConstraint(const std::string& name,
+				   const std::string& propagatorName,
+				   const ConstraintEngineId constraintEngine,
 				   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
     check_error(variables.size() == 2);
@@ -2112,9 +1856,9 @@ namespace EUROPA {
   }
 
 
-  TestEQ::TestEQ(const LabelStr& name,
-                           const LabelStr& propagatorName,
-                           const ConstraintEngineId& constraintEngine,
+  TestEQ::TestEQ(const std::string& name,
+                           const std::string& propagatorName,
+                           const ConstraintEngineId constraintEngine,
                            const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2144,9 +1888,9 @@ namespace EUROPA {
     }
   }
 
-  TestSingleton::TestSingleton(const LabelStr& name,
-			   const LabelStr& propagatorName,
-			   const ConstraintEngineId& constraintEngine,
+  TestSingleton::TestSingleton(const std::string& name,
+			   const std::string& propagatorName,
+			   const ConstraintEngineId constraintEngine,
 			   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2170,9 +1914,9 @@ namespace EUROPA {
     return m_modifiedVariables;
   }
 
-  TestSpecified::TestSpecified(const LabelStr& name,
-			   const LabelStr& propagatorName,
-			   const ConstraintEngineId& constraintEngine,
+  TestSpecified::TestSpecified(const std::string& name,
+			   const std::string& propagatorName,
+			   const ConstraintEngineId constraintEngine,
 			   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2191,9 +1935,9 @@ namespace EUROPA {
     //what is test if m_arg1 is not a singleton.
   }
 
-  TestNEQ::TestNEQ(const LabelStr& name,
-			   const LabelStr& propagatorName,
-			   const ConstraintEngineId& constraintEngine,
+  TestNEQ::TestNEQ(const std::string& name,
+			   const std::string& propagatorName,
+			   const ConstraintEngineId constraintEngine,
 			   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2231,9 +1975,9 @@ namespace EUROPA {
   }
 
 
-  TestOr::TestOr(const LabelStr& name,
-		 const LabelStr& propagatorName,
-		 const ConstraintEngineId& constraintEngine,
+  TestOr::TestOr(const std::string& name,
+		 const std::string& propagatorName,
+		 const ConstraintEngineId constraintEngine,
 		 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2274,9 +2018,9 @@ namespace EUROPA {
     }
   }
 
-  TestAnd::TestAnd(const LabelStr& name,
-		   const LabelStr& propagatorName,
-		   const ConstraintEngineId& constraintEngine,
+  TestAnd::TestAnd(const std::string& name,
+		   const std::string& propagatorName,
+		   const ConstraintEngineId constraintEngine,
 		   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2317,9 +2061,9 @@ namespace EUROPA {
 
   }
 
-  TestLessThan::TestLessThan(const LabelStr& name,
-			     const LabelStr& propagatorName,
-			     const ConstraintEngineId& constraintEngine,
+  TestLessThan::TestLessThan(const std::string& name,
+			     const std::string& propagatorName,
+			     const ConstraintEngineId constraintEngine,
 			     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2351,9 +2095,9 @@ namespace EUROPA {
     }
   }
 
-  TestLEQ::TestLEQ(const LabelStr& name,
-			     const LabelStr& propagatorName,
-			     const ConstraintEngineId& constraintEngine,
+  TestLEQ::TestLEQ(const std::string& name,
+			     const std::string& propagatorName,
+			     const ConstraintEngineId constraintEngine,
 			     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_test(getCurrentDomain(variables[0])),
@@ -2391,9 +2135,9 @@ namespace EUROPA {
   /**
    * WithinBounds Implementation
    */
-  WithinBounds::WithinBounds(const LabelStr& name,
-			     const LabelStr& propagatorName,
-			     const ConstraintEngineId& constraintEngine,
+  WithinBounds::WithinBounds(const std::string& name,
+			     const std::string& propagatorName,
+			     const ConstraintEngineId constraintEngine,
 			     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_x(static_cast<IntervalDomain&>(getCurrentDomain(variables[0]))),
@@ -2408,33 +2152,33 @@ namespace EUROPA {
     m_x.intersect(m_y.getLowerBound(), m_z.getUpperBound());
   }
 
-  void AbsoluteValueCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
-  {
-      if (argTypes.size() != 2) {
-          std::ostringstream msg; msg << "Constraint AbsoluteValue takes 2 args, not " << argTypes.size();
-          throw msg.str();
-      }
+  // void AbsoluteValueCT::checkArgTypes(const std::vector<DataTypeId>& argTypes) const
+  // {
+  //     if (argTypes.size() != 2) {
+  //         std::ostringstream msg; msg << "Constraint AbsoluteValue takes 2 args, not " << argTypes.size();
+  //         throw msg.str();
+  //     }
 
-      for (unsigned int i=0; i< argTypes.size(); i++) {
-          if (!argTypes[i]->isNumeric()) {
-              std::ostringstream msg;
-              msg << "Parameter " << i << " for Constraint AbsoluteValue is not numeric : "
-                  << argTypes[i]->getName().toString();
-              throw msg.str();
-          }
-      }
+  //     for (unsigned int i=0; i< argTypes.size(); i++) {
+  //         if (!argTypes[i]->isNumeric()) {
+  //             std::ostringstream msg;
+  //             msg << "Parameter " << i << " for Constraint AbsoluteValue is not numeric : "
+  //                 << argTypes[i]->getName().toString();
+  //             throw msg.str();
+  //         }
+  //     }
 
-      if (!argTypes[0]->isAssignableFrom(argTypes[1])) {
-          std::ostringstream msg;
-          msg << argTypes[0]->getName().toString() << " can't hold AbsoluteValue for : "
-              << argTypes[1]->getName().toString();
-          throw msg.str();
-      }
-  }
+  //     if (!argTypes[0]->isAssignableFrom(argTypes[1])) {
+  //         std::ostringstream msg;
+  //         msg << argTypes[0]->getName().toString() << " can't hold AbsoluteValue for : "
+  //             << argTypes[1]->getName().toString();
+  //         throw msg.str();
+  //     }
+  // }
 
-  AbsoluteValue::AbsoluteValue(const LabelStr& name,
-			       const LabelStr& propagatorName,
-			       const ConstraintEngineId& constraintEngine,
+  AbsoluteValue::AbsoluteValue(const std::string& name,
+			       const std::string& propagatorName,
+			       const ConstraintEngineId constraintEngine,
 			       const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_x(static_cast<IntervalDomain&>(getCurrentDomain(variables[0]))),
@@ -2477,12 +2221,12 @@ namespace EUROPA {
       m_y.intersect(IntervalDomain(-ub, -lb));
   }
 
-  SquareOfDifferenceConstraint::SquareOfDifferenceConstraint(const LabelStr& name,
-							     const LabelStr& propagatorName,
-							     const ConstraintEngineId& constraintEngine,
+  SquareOfDifferenceConstraint::SquareOfDifferenceConstraint(const std::string& name,
+							     const std::string& propagatorName,
+							     const ConstraintEngineId constraintEngine,
 							     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
+    check_error(variables.size() == ARG_COUNT);
   }
 
   /**
@@ -2510,12 +2254,12 @@ namespace EUROPA {
 
   }
 
-  DistanceFromSquaresConstraint::DistanceFromSquaresConstraint(const LabelStr& name,
-					 const LabelStr& propagatorName,
-					 const ConstraintEngineId& constraintEngine,
+  DistanceFromSquaresConstraint::DistanceFromSquaresConstraint(const std::string& name,
+					 const std::string& propagatorName,
+					 const ConstraintEngineId constraintEngine,
 					 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables) {
-    check_error(variables.size() == (unsigned int) ARG_COUNT);
+    check_error(variables.size() == ARG_COUNT);
   }
 
   /**
@@ -2544,9 +2288,9 @@ namespace EUROPA {
     // cout << "DistanceFromSquares "<<x<<" "<<y<<" "<<distance<<endl;
   }
 
-  CalcDistanceConstraint::CalcDistanceConstraint(const LabelStr& name,
-						 const LabelStr& propagatorName,
-						 const ConstraintEngineId& constraintEngine,
+  CalcDistanceConstraint::CalcDistanceConstraint(const std::string& name,
+						 const std::string& propagatorName,
+						 const ConstraintEngineId constraintEngine,
 						 const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_distance(getCurrentDomain(variables[DISTANCE])),
@@ -2554,7 +2298,7 @@ namespace EUROPA {
       m_y1(getCurrentDomain(variables[Y1])),
       m_x2(getCurrentDomain(variables[X2])),
       m_y2(getCurrentDomain(variables[Y2])){
-    checkError(variables.size() == ARG_COUNT, variables.size() << " is the wrong number of arguments for " << name.toString());
+    checkError(variables.size() == ARG_COUNT, variables.size() << " is the wrong number of arguments for " << name);
   }
 
   void CalcDistanceConstraint::handleExecute(){
@@ -2603,14 +2347,14 @@ namespace EUROPA {
 
   /**************************************************************************************/
 
-  SineFunction::SineFunction(const LabelStr& name,
-			     const LabelStr& propagatorName,
-			     const ConstraintEngineId& constraintEngine,
+  SineFunction::SineFunction(const std::string& name,
+			     const std::string& propagatorName,
+			     const ConstraintEngineId constraintEngine,
 			     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_target(getCurrentDomain(variables[0])),
       m_source(getCurrentDomain(variables[1])){
-    checkError(variables.size() == ARG_COUNT, variables.size() << " is the wrong number of arguments for " << name.toString());
+    checkError(variables.size() == ARG_COUNT, variables.size() << " is the wrong number of arguments for " << name);
   }
 
   void SineFunction::handleExecute(){
@@ -2630,9 +2374,9 @@ namespace EUROPA {
 
   /**************************************************************************************/
 
-  RandConstraint::RandConstraint(const LabelStr& name,
-			     const LabelStr& propagatorName,
-			     const ConstraintEngineId& constraintEngine,
+  RandConstraint::RandConstraint(const std::string& name,
+			     const std::string& propagatorName,
+			     const ConstraintEngineId constraintEngine,
 			     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables), m_rvalue(rand() % 32768) {}
 
@@ -2640,9 +2384,10 @@ namespace EUROPA {
     getCurrentDomain(m_variables[0]).intersect(m_rvalue, m_rvalue);
   }
 
-  eint mod(eint a, eint b) { return a % b; }
-  eint mod(edouble a, edouble b) {return cast_int(a) % cast_int(b);}
-
+namespace {
+//eint mod(eint a, eint b) { return a % b; }
+eint mod(edouble a, edouble b) {return static_cast<eint::basis_type>(std::fmod(cast_basis(a), cast_basis(b)));}
+}
   CREATE_FUNCTION_CONSTRAINT_TWO_ARG(Max, std::max, edouble);
   CREATE_FUNCTION_CONSTRAINT_TWO_ARG(Min, std::min, edouble);
   CREATE_FUNCTION_CONSTRAINT_ONE_ARG(Abs, std::abs, edouble);
@@ -2654,6 +2399,95 @@ namespace EUROPA {
 
   CREATE_FUNCTION_CONSTRAINT_ONE_ARG(Floor, std::floor, edouble);
   CREATE_FUNCTION_CONSTRAINT_ONE_ARG(Ceil, std::ceil, edouble);
+
+EqUnionConstraint::EqUnionConstraint(const std::string& name,
+                                     const std::string& propagatorName,
+                                     const ConstraintEngineId constraintEngine,
+                                     const std::vector<ConstrainedVariableId>& variables)
+    : Constraint(name, propagatorName, constraintEngine, variables) {}
+
+void EqUnionConstraint::handleExecute() {
+  if(getCurrentDomain(m_variables[0]).isEnumerated()) {
+    handleExecuteEnumerated(dynamic_cast<EnumeratedDomain&>(getCurrentDomain(m_variables[0])),
+                            m_variables.begin() + 1, m_variables.end());
+  }
+  else {
+    handleExecuteInterval(dynamic_cast<IntervalDomain&>(getCurrentDomain(m_variables[0])),
+                          m_variables.begin() + 1, m_variables.end());
+  }
+}
+
+void EqUnionConstraint::handleExecuteInterval(IntervalDomain& dest,
+                                              std::vector<ConstrainedVariableId>::const_iterator start,
+                                              const std::vector<ConstrainedVariableId>::const_iterator end) {
+  edouble minValue = std::numeric_limits<edouble>::max(),
+      maxValue = std::numeric_limits<edouble>::min();
+  
+  for(std::vector<ConstrainedVariableId>::const_iterator it = start; it != end; ++it) {
+    minValue = std::min(minValue, getCurrentDomain(*it).getLowerBound());
+    maxValue = std::max(maxValue, getCurrentDomain(*it).getUpperBound());
+  }
+  minValue = std::max(minValue, dest.getLowerBound());
+  maxValue = std::min(maxValue, dest.getUpperBound());
+
+  dest.intersect(minValue, maxValue);
+  for(std::vector<ConstrainedVariableId>::const_iterator it = start; it != end; ++it) {
+    if(dest.isEmpty())
+      getCurrentDomain(*it).empty();
+    else
+      getCurrentDomain(*it).intersect(dest);
+  }
+}
+
+namespace {
+struct InInterval {
+  InInterval(const edouble v) : m_v(v) {}
+  bool operator()(const std::pair<edouble, edouble>& i) {
+    return i.first <= m_v && m_v <= i.second;
+  }
+ private:
+  edouble m_v;
+};
+}
+void EqUnionConstraint::handleExecuteEnumerated(EnumeratedDomain& dest,
+                                                std::vector<ConstrainedVariableId>::const_iterator start,
+                                                const std::vector<ConstrainedVariableId>::const_iterator end) {
+  std::set<edouble> enumUnion;
+  std::vector<std::pair<edouble, edouble> > intervalUnion;
+
+  //collect enumerated and interval unions separately
+  for(std::vector<ConstrainedVariableId>::const_iterator it = start; it != end; ++it) {
+    Domain& temp = getCurrentDomain(*it);
+    if(temp.isEnumerated()) {
+      EnumeratedDomain& etemp = dynamic_cast<EnumeratedDomain&>(getCurrentDomain(*it));
+      enumUnion.insert(etemp.getValues().begin(), etemp.getValues().end());
+    }
+    else {
+      intervalUnion.push_back(std::make_pair(temp.getLowerBound(), temp.getUpperBound()));
+    }
+  }
+  //NOTE: if it turns out that a lot of time is being spent in checking values against
+  //the intervalUnion, it may be worth it to combine contiguous unions
+  
+  std::list<edouble> existingValues;
+  dest.getValues(existingValues);
+  for(std::list<edouble>::const_iterator it = existingValues.begin();
+      it != existingValues.end(); ++it) {
+    if((enumUnion.find(*it) == enumUnion.end()) &&
+       (std::find_if(intervalUnion.begin(), intervalUnion.end(), InInterval(*it)) ==
+          intervalUnion.end()))
+      dest.remove(*it);
+  }
+
+
+  for(std::vector<ConstrainedVariableId>::const_iterator it = start; it != end; ++it) {
+    if(dest.isEmpty())
+      getCurrentDomain(*it).empty();
+    else
+      getCurrentDomain(*it).intersect(dest);
+  }
+}
+
 
 
 

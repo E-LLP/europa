@@ -10,6 +10,7 @@
 #include "PSPlanDatabaseListener.hh"
 #include "PSConstraintEngineListener.hh"
 #include "NddlInterpreter.hh"
+  #include "PSVarValue.hh"
 %}
 
 %rename(PSException) Error;  // Our Error C++ class is wrapped instead as PSException
@@ -371,7 +372,7 @@ namespace EUROPA {
   public:
 	  ~PSSchema();
 	  PSList<std::string> getAllPredicates() const;
-	  PSList<std::string> getMembers(const std::string& objectType) const;
+	  PSList<std::string> getObjectMembers(const std::string& objectType) const;
 	  bool hasMember(const std::string& parentType, const std::string& memberName) const;
 	  
 	  PSList<PSObjectType*> getAllPSObjectTypes() const;

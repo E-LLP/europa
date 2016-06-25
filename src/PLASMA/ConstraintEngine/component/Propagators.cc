@@ -16,45 +16,46 @@
 
 namespace EUROPA {
 
-  DefaultPropagator::DefaultPropagator(const LabelStr& name, const ConstraintEngineId& constraintEngine, int priority)
-  	  : Propagator(name, constraintEngine, priority)
-  	  , m_activeConstraint(0)
-  {
-  }
+DefaultPropagator::DefaultPropagator(const std::string& name, 
+                                     const ConstraintEngineId constraintEngine, 
+                                     int priority)
+    : Propagator(name, constraintEngine, priority),
+      m_agenda(),
+      m_activeConstraint(0) { }
 
-  void DefaultPropagator::handleConstraintAdded(const ConstraintId& constraint){
-    debugMsg("DefaultPropagator:handleConstraintAdded", "Adding to the agenda: " << constraint->getName().toString() << "(" << constraint->getKey() << ")");
+  void DefaultPropagator::handleConstraintAdded(const ConstraintId constraint){
+    debugMsg("DefaultPropagator:handleConstraintAdded", "Adding to the agenda: " << constraint->getName() << "(" << constraint->getKey() << ")");
     m_agenda.insert(constraint);
   }
 
-  void DefaultPropagator::handleConstraintRemoved(const ConstraintId& constraint){
+  void DefaultPropagator::handleConstraintRemoved(const ConstraintId constraint){
     // Remove from agenda
-    debugMsg("DefaultPropagator:handleConstraintRemoved", "Removing from the agenda: " << constraint->getName().toString() << "(" << constraint->getKey() << ")");
+    debugMsg("DefaultPropagator:handleConstraintRemoved", "Removing from the agenda: " << constraint->getName() << "(" << constraint->getKey() << ")");
     m_agenda.erase(constraint);
     check_error(isValid());
   }
 
-  void DefaultPropagator::handleConstraintActivated(const ConstraintId& constraint){
-    debugMsg("DefaultPropagator:handleConstraintActivated", "Adding to the agenda: " << constraint->getName().toString() << "(" << constraint->getKey() << ")");
+  void DefaultPropagator::handleConstraintActivated(const ConstraintId constraint){
+    debugMsg("DefaultPropagator:handleConstraintActivated", "Adding to the agenda: " << constraint->getName() << "(" << constraint->getKey() << ")");
     m_agenda.insert(constraint);
     check_error(isValid());
   }
 
-  void DefaultPropagator::handleConstraintDeactivated(const ConstraintId& constraint){
+  void DefaultPropagator::handleConstraintDeactivated(const ConstraintId constraint){
     // Remove from agenda
-    debugMsg("DefaultPropagator:handleConstraintDeactivated", "Removing from the agenda: " << constraint->getName().toString() << "(" << constraint->getKey() << ")");
+    debugMsg("DefaultPropagator:handleConstraintDeactivated", "Removing from the agenda: " << constraint->getName() << "(" << constraint->getKey() << ")");
     m_agenda.erase(constraint);
     check_error(isValid());
   }
 
-  void DefaultPropagator::handleNotification(const ConstrainedVariableId& variable,
-					     int argIndex,
-					     const ConstraintId& constraint,
+  void DefaultPropagator::handleNotification(const ConstrainedVariableId variable,
+					     unsigned int,
+					     const ConstraintId constraint,
 					     const DomainListener::ChangeType& changeType){
     checkError(!constraint->isDiscarded(), constraint);
     if(constraint->getKey() != m_activeConstraint) {
       debugMsg("DefaultPropagator:handleNotification",
-          "Adding to the agenda: " << constraint->getName().toString() << "(" << constraint->getKey() << ")"
+          "Adding to the agenda: " << constraint->getName() << "(" << constraint->getKey() << ")"
           << " because of " << DomainListener::toString(changeType) << " change to " << variable->toString()
       );
       m_agenda.insert(constraint);
@@ -101,14 +102,16 @@ namespace EUROPA {
       ConstraintId constraint = *it;
       checkError(constraint.isValid(), constraint);
       checkError(!constraint->isDiscarded(),
-		 constraint->getName().toString() << "(" << constraint->getKey() << ") Id=" << constraint);
+		 constraint->getName() << "(" << constraint->getKey() << ") Id=" << constraint);
     }
     return true;
   }
 
 
-  EqualityConstraintPropagator::EqualityConstraintPropagator(const LabelStr& name, const ConstraintEngineId& constraintEngine)
-    : Propagator(name, constraintEngine), m_fullReprop(false), m_active(false){}
+EqualityConstraintPropagator::EqualityConstraintPropagator(const std::string& name,
+                                                           const ConstraintEngineId constraintEngine)
+    : Propagator(name, constraintEngine), m_fullReprop(false), m_active(false),
+      m_eqClassCollection(), m_eqClassAgenda() {}
 
   EqualityConstraintPropagator::~EqualityConstraintPropagator(){}
 
@@ -134,10 +137,10 @@ namespace EUROPA {
     return (!m_eqClassAgenda.empty() || m_fullReprop);
   }
 
-  void EqualityConstraintPropagator::handleConstraintAdded(const ConstraintId& constraint){
+  void EqualityConstraintPropagator::handleConstraintAdded(const ConstraintId constraint){
     check_error(!m_active);
-    const ConstrainedVariableId& x = constraint->getScope()[0];
-    const ConstrainedVariableId& y = constraint->getScope()[1];
+    const ConstrainedVariableId x = constraint->getScope()[0];
+    const ConstrainedVariableId y = constraint->getScope()[1];
 
     // Remove old equivalence classes for these variables from the agenda since they are abut to be merged.
     m_eqClassAgenda.erase(m_eqClassCollection.getGraphKey(x));
@@ -148,26 +151,26 @@ namespace EUROPA {
     m_eqClassAgenda.insert(m_eqClassCollection.getGraphKey(x));
   }
 
-  void EqualityConstraintPropagator::handleConstraintRemoved(const ConstraintId& constraint){
+  void EqualityConstraintPropagator::handleConstraintRemoved(const ConstraintId constraint){
     check_error(!m_active);
-    const ConstrainedVariableId& x = constraint->getScope()[0];
-    const ConstrainedVariableId& y = constraint->getScope()[1];
+    const ConstrainedVariableId x = constraint->getScope()[0];
+    const ConstrainedVariableId y = constraint->getScope()[1];
     m_eqClassCollection.removeConnection(x, y);
     m_fullReprop = true;
   }
 
-  void EqualityConstraintPropagator::handleConstraintActivated(const ConstraintId& constraint){
+  void EqualityConstraintPropagator::handleConstraintActivated(const ConstraintId constraint){
     handleConstraintAdded(constraint);
   }
 
-  void EqualityConstraintPropagator::handleConstraintDeactivated(const ConstraintId& constraint){
+  void EqualityConstraintPropagator::handleConstraintDeactivated(const ConstraintId constraint){
     handleConstraintRemoved(constraint);
   }
 
-  void EqualityConstraintPropagator::handleNotification(const ConstrainedVariableId& variable,
-                                                        int argIndex,
-                                                        const ConstraintId& constraint,
-                                                        const DomainListener::ChangeType& changeType){
+  void EqualityConstraintPropagator::handleNotification(const ConstrainedVariableId variable,
+                                                        unsigned int,
+                                                        const ConstraintId constraint,
+                                                        const DomainListener::ChangeType&){
     check_error(Id<EqualConstraint>::convertable(constraint));
 
     if(!m_fullReprop && !m_active){
@@ -178,61 +181,63 @@ namespace EUROPA {
     }
   }
 
-  void processScope(const std::set<ConstrainedVariableId>& scope) {
-    Domain& domain(EqualConstraint::getCurrentDomain(* (scope.begin())));
+namespace {
+void processScope(const std::set<ConstrainedVariableId>& scope) {
+  Domain& domain(EqualConstraint::getCurrentDomain(* (scope.begin())));
 
-    if (domain.isOpen())
+  if (domain.isOpen())
+    return;
+
+  // Set up the initial values to match others against.
+  bool isFinite = domain.isFinite();
+
+  // int domainType = domain.getType(); // Unused; see below.
+
+  // Iterate over, restricting domain as we go.
+  for (std::set<ConstrainedVariableId>::const_iterator it = scope.begin(); 
+       it != scope.end(); ++it) {
+    Domain& currentDomain = EqualConstraint::getCurrentDomain(*it);
+
+    // This next check is incorrect: could be false when they can be
+    // compared (real enumerations and integer intervals, e.g.) and
+    // could be true when they cannot be compared (e.g., two distinct
+    // label sets, which both have a DomainType of USER_DEFINED).
+    // The correct check follows.
+    // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 21
+    // check_error(currentDomain.getType() == domainType);
+
+    check_error(Domain::canBeCompared(domain, currentDomain));
+
+    // This will preclude possible propagation to the point of allowing
+    // an arbitrary amount of useless search during planning, including
+    // not even intersecting with closed domains later in the scope.
+    // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 21
+    if (currentDomain.isOpen())
       return;
 
-    // Set up the initial values to match others against.
-    bool isFinite = domain.isFinite();
-
-    // int domainType = domain.getType(); // Unused; see below.
-
-    // Iterate over, restricting domain as we go.
-    for (std::set<ConstrainedVariableId>::const_iterator it = scope.begin(); 
-         it != scope.end(); ++it) {
-      Domain& currentDomain = EqualConstraint::getCurrentDomain(*it);
-
-      // This next check is incorrect: could be false when they can be
-      // compared (real enumerations and integer intervals, e.g.) and
-      // could be true when they cannot be compared (e.g., two distinct
-      // label sets, which both have a DomainType of USER_DEFINED).
-      // The correct check follows.
-      // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 21
-      // check_error(currentDomain.getType() == domainType);
-
-      check_error(Domain::canBeCompared(domain, currentDomain));
-
-      // This will preclude possible propagation to the point of allowing
-      // an arbitrary amount of useless search during planning, including
-      // not even intersecting with closed domains later in the scope.
-      // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 21
-      if (currentDomain.isOpen())
-        return;
-
-      // What if the domains are (numeric) [-Inf Inf] and (integer) [0 1] ?
-      // This would appear to incorrectly provoke an inconsistency in that case.
-      // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 22
-      //
-      //I don't even know what this is supposed to express.  It seems wrong in every case.
-      //I'm adding parens here in the most sensible-ish place to quiet a warning. ~MJI
-      if ((currentDomain.isFinite() != isFinite ||
-           domain.intersect(currentDomain)) && domain.isEmpty()) {
-        currentDomain.empty();
-        return;
-      }
-    }
-
-    // If we get to here, we have computed the new domain for all
-    // variables in the scope and we know that no domain has been
-    // emptied (this could be optimized by recording the last change
-    // to domain).
-    for (std::set<ConstrainedVariableId>::const_iterator it = scope.begin(); it != scope.end(); ++it) {
-      Domain& currentDomain = EqualConstraint::getCurrentDomain(*it);
-      currentDomain.intersect(domain);
+    // What if the domains are (numeric) [-Inf Inf] and (integer) [0 1] ?
+    // This would appear to incorrectly provoke an inconsistency in that case.
+    // --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 22
+    //
+    //I don't even know what this is supposed to express.  It seems wrong in every case.
+    //I'm adding parens here in the most sensible-ish place to quiet a warning. ~MJI
+    if ((currentDomain.isFinite() != isFinite ||
+         domain.intersect(currentDomain)) && domain.isEmpty()) {
+      currentDomain.empty();
+      return;
     }
   }
+
+  // If we get to here, we have computed the new domain for all
+  // variables in the scope and we know that no domain has been
+  // emptied (this could be optimized by recording the last change
+  // to domain).
+  for (std::set<ConstrainedVariableId>::const_iterator it = scope.begin(); it != scope.end(); ++it) {
+    Domain& currentDomain = EqualConstraint::getCurrentDomain(*it);
+    currentDomain.intersect(domain);
+  }
+}
+}
 
   void EqualityConstraintPropagator::equate(const std::set<ConstrainedVariableId>& scope) {
     check_error(!scope.empty());

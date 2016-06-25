@@ -1,9 +1,9 @@
-#ifndef _H_PSConstraintEngine
-#define _H_PSConstraintEngine
+#ifndef H_PSConstraintEngine
+#define H_PSConstraintEngine
 
 #include "Engine.hh"
-#include "PSUtils.hh"
-#include "LabelStr.hh"
+#include "PSEntity.hh"
+#include "PSList.hh"
 
 namespace EUROPA {
 

@@ -1,5 +1,5 @@
-#ifndef _H_PSResource
-#define _H_PSResource
+#ifndef H_PSResource
+#define H_PSResource
 
 #include "PSPlanDatabase.hh"
 #include "ResourceDefs.hh"
@@ -41,7 +41,7 @@ namespace EUROPA {
 	class PSGenericProfile : public PSResourceProfile
 	{
 	public:
-		PSGenericProfile(const ExplicitProfileId& profile);
+		PSGenericProfile(const ExplicitProfileId profile);
 		virtual ~PSGenericProfile() {}
 
 		virtual PSList<TimePoint> getTimes();
@@ -55,7 +55,7 @@ namespace EUROPA {
 	class PSUsageProfile : public PSResourceProfile
 	{
 	public:
-		PSUsageProfile(const ProfileId& profile);
+		PSUsageProfile(const ProfileId profile);
 		virtual ~PSUsageProfile() {}
 
 		virtual PSList<TimePoint> getTimes();

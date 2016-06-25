@@ -12,10 +12,10 @@
  * @date March, 2005
  */
 namespace EUROPA {
-  namespace SOLVERS {
+namespace SOLVERS {
 
-    OpenConditionManager::OpenConditionManager(const TiXmlElement& configData)
-      : FlawManager(configData) {}
+OpenConditionManager::OpenConditionManager(const TiXmlElement& configData)
+    : FlawManager(configData), m_flawCandidates() {}
 
     void OpenConditionManager::handleInitialize(){
       // FILL UP TOKENS
@@ -34,11 +34,11 @@ namespace EUROPA {
     /**
      * Filter out if not a token
      */
-    bool OpenConditionManager::staticMatch(const EntityId& entity){
+    bool OpenConditionManager::staticMatch(const EntityId entity){
       return !TokenId::convertable(entity) || FlawManager::staticMatch(entity);
     }
 
-    void OpenConditionManager::addFlaw(const TokenId& token){
+    void OpenConditionManager::addFlaw(const TokenId token){
       if(token->isInactive() && !staticMatch(token)){
 	debugMsg("OpenConditionManager:addFlaw",
 		 "Adding " << token->toString() << " as a candidate flaw.");
@@ -46,18 +46,18 @@ namespace EUROPA {
       }
     }
 
-    void OpenConditionManager::removeFlaw(const TokenId& token){
+    void OpenConditionManager::removeFlaw(const TokenId token){
       condDebugMsg(m_flawCandidates.find(token) != m_flawCandidates.end(), "OpenConditionManager:removeFlaw", "Removing " << token->toString() << " as a flaw.");
       m_flawCandidates.erase(token);
     }
 
-    void OpenConditionManager::notifyRemoved(const ConstrainedVariableId& variable){
+    void OpenConditionManager::notifyRemoved(const ConstrainedVariableId variable){
       FlawManager::notifyRemoved(variable);
       if(Token::isStateVariable(variable))
 	removeFlaw(variable->parent());
     }
 
-    void OpenConditionManager::notifyChanged(const ConstrainedVariableId& variable, 
+    void OpenConditionManager::notifyChanged(const ConstrainedVariableId variable, 
 					     const DomainListener::ChangeType& changeType){
       if(!Token::isStateVariable(variable))
 	return;
@@ -72,7 +72,7 @@ namespace EUROPA {
 
     DecisionPointId OpenConditionManager::nextZeroCommitmentDecision()
     {
-    	static LabelStr explanation("Processing action effects first");
+    	static std::string explanation("Processing action effects first");
 
     	for(TokenSet::const_iterator it=m_flawCandidates.begin();it != m_flawCandidates.end();++it) {
     		TokenId token = *it;
@@ -88,7 +88,7 @@ namespace EUROPA {
     	return DecisionPointId::noId();
     }
 
-    std::string OpenConditionManager::toString(const EntityId& entity) const {
+    std::string OpenConditionManager::toString(const EntityId entity) const {
       checkError(TokenId::convertable(entity), entity->toString());
       TokenId token = entity;
       std::stringstream os;

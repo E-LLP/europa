@@ -1,5 +1,5 @@
-#ifndef _H_ResourceThreatDecisionPoint
-#define _H_ResourceThreatDecisionPoint
+#ifndef H_ResourceThreatDecisionPoint
+#define H_ResourceThreatDecisionPoint
 
 #include "SolverDecisionPoint.hh"
 #include "ResourceDefs.hh"
@@ -15,7 +15,7 @@ namespace EUROPA {
 
     class ResourceThreatDecisionPoint : public SOLVERS::DecisionPoint {
     public:
-      ResourceThreatDecisionPoint(const DbClientId& client, const InstantId& inst, const TiXmlElement& configData, const LabelStr& explanation = "unknown");
+      ResourceThreatDecisionPoint(const DbClientId client, const InstantId inst, const TiXmlElement& configData, const std::string& explanation = "unknown");
       virtual ~ResourceThreatDecisionPoint();
       virtual std::string toString() const;
       virtual std::string toShortString() const;
@@ -27,20 +27,20 @@ namespace EUROPA {
       virtual bool canUndo() const;
       virtual void handleExecute();
       virtual void handleUndo();
-      static bool test(const EntityId& entity);
+      static bool test(const EntityId entity);
 
     private:
       std::string toString(const std::pair<TransactionId, TransactionId>& choice) const;
-      void createFilter(ChoiceFilters& filters, const std::string& filter, ProfileId& profile);
+      void createFilter(ChoiceFilters& filters, const std::string& filter, ProfileId profile);
       void createOrder(ChoiceOrder& order);
     protected:
       InstantId m_flawedInstant;
       std::vector<std::pair<TransactionId, TransactionId> > m_choices;
-      unsigned int m_choiceCount;
-      unsigned int m_index;
+      unsigned long m_choiceCount;
+      unsigned long m_index;
       ConstraintId m_constr;
       eint m_instTime;
-      LabelStr m_resName;
+      std::string m_resName;
       std::string m_order;
       std::string m_filter;
       std::string m_constraintOrder;

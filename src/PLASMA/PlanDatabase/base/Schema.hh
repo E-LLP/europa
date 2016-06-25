@@ -5,12 +5,11 @@
  * @author Conor McGann, Andrew Bachmann
  */
 
-#ifndef _H_Schema
-#define _H_Schema
+#ifndef H_Schema
+#define H_Schema
 
 #include "PlanDatabaseDefs.hh"
 #include "PSPlanDatabase.hh"
-#include "LabelStr.hh"
 #include "Domain.hh"
 #include "ObjectType.hh"
 #include "TokenTypeMgr.hh"
@@ -19,8 +18,7 @@
 #include <vector>
 
 namespace EUROPA {
-
-  typedef std::set<edouble> LabelStrSet;
+class LabelStr;
 
   /**
    * @class Schema
@@ -36,38 +34,34 @@ namespace EUROPA {
   class Schema: public DomainComparator, public PSSchema {
   public:
 
-    typedef std::pair<LabelStr, LabelStr> NameValuePair;
+    typedef std::pair<std::string, std::string> NameValuePair;
     typedef std::vector<NameValuePair> NameValueVector;
     typedef std::set<edouble> ValueSet;
-    typedef std::map<edouble, LabelStr> LabelStr_LabelStr_Map;
-    typedef std::map<edouble, LabelStrSet > LabelStr_LabelStrSet_Map;
-    typedef std::map<edouble, ValueSet > LabelStr_ValueSet_Map;
-    typedef std::map<edouble,LabelStr_LabelStr_Map> LabelStr_LabelStrLabelStrMap_Map;
 
-    Schema(const LabelStr& name, const CESchemaId& cesch);
+    Schema(const std::string& name, const CESchemaId cesch);
     ~Schema();
 
     /**
      * @brief Retrieve the delimiter for separating elements in schema element names.
      */
-    static const char* getDelimiter();
+    static const char getDelimiter();
 
     /**
      * @brief Creates a fully qualifiedName for a predicate
      * @see getDelimiter()
      */
-    static const LabelStr makeQualifiedName(const LabelStr& objectType,
-					    const LabelStr& unqualifiedPredicateName);
+    static const std::string makeQualifiedName(const std::string& objectType,
+                                               const std::string& unqualifiedPredicateName);
 
     /**
      * @brief Accessor for the root object
      */
-    static const LabelStr& rootObject();
+    static const std::string& rootObject();
 
 
-    const SchemaId& getId() const;
+    const SchemaId getId() const;
 
-    const LabelStr& getName() const;
+    const std::string& getName() const;
 
     /**
      * @brief Implements the DomainComparator interface function
@@ -84,48 +78,48 @@ namespace EUROPA {
     /**
      * @brief Tests if the given name is a defined objectType or predciate
      */
-    bool isType(const LabelStr& type) const;
+    bool isType(const std::string& type) const;
 
 
     /**
      * @brief Tests if the given name is a recognized primitove type
      */
-    bool isPrimitive(const LabelStr& str) const;
+    bool isPrimitive(const std::string& str) const;
 
     /**
      * @brief Test if the given string is an enumerated type
      */
-    bool isEnum(const LabelStr& str) const;
+    bool isEnum(const std::string& str) const;
 
     /**
-     * @brief Test if the given value is a member of the given enum
+     * @brief Test if the given value is a member of the given enum.  Calling this 
+     *        function with a name that isn't an enum is an error.
      * @param enumName The name of the enumeration
      * @param value The value to be tested.
-     * @error !isEnum(enum)
      */
-    bool isEnumValue(const LabelStr& enumName, edouble value) const;
+    bool isEnumValue(const std::string& enumName, const edouble value) const;
 
     /**
      * @brief Test if the given value is a member of any enum
      * @param value The value to be tested.
      */
-    bool isEnumValue(edouble value) const;
+    bool isEnumValue(const edouble value) const;
 
     /**
      * @brief Determine of a given predicate is part of the schema
      */
-    bool isPredicate(const LabelStr& type) const;
+    bool isPredicate(const std::string& type) const;
 
     /**
      * @brief Test if the given string is a class name
      */
-    bool isObjectType(const LabelStr& type) const;
+    bool isObjectType(const std::string& type) const;
 
     /**
      * @brief Determine if a given predicate is compatible with a given object type.
      */
-    bool canBeAssigned(const LabelStr& objectType,
-		       const LabelStr& predicate) const;
+    bool canBeAssigned(const std::string& objectType,
+		       const std::string& predicate) const;
 
     /**
      * @brief Determine if a given composition of objects is allowed.
@@ -133,9 +127,9 @@ namespace EUROPA {
      * @param memberType the type of the composed object
      * @param memberName the member name for the composed field.
      */
-    bool canContain(const LabelStr& parentType,
-		    const LabelStr& memberType,
-		    const LabelStr& memberName) const;
+    bool canContain(const std::string& parentType,
+		    const std::string& memberType,
+		    const std::string& memberName) const;
 
     /**
      *
@@ -144,22 +138,22 @@ namespace EUROPA {
      * - the first element is the member's type
      * - the second elemnt is the member's name
      */
-    const NameValueVector& getMembers(const LabelStr& objectType) const;
+    const NameValueVector& getMembers(const std::string& objectType) const;
 
     /**
      * @brief Determines if the given member is contained in the parent
      * @param parentType the type of the composing object or predicate
      * @param memberName the member name for the composed field.
      */
-    bool hasMember(const LabelStr& parentType, const LabelStr& memberName) const;
+    bool hasMember(const std::string& parentType, const std::string& memberName) const;
 
     /**
      * @brief Gets the type of a parents member.
      * @param parentType The parentType.
      * @param parameterName The parameter name.
      */
-    const LabelStr getMemberType(const LabelStr& parentType,
-					 const LabelStr& parameterName) const;
+    const std::string getMemberType(const std::string& parentType,
+					 const std::string& parameterName) const;
 
     /**
      * @brief Determine if one type is a sub type of another
@@ -167,7 +161,7 @@ namespace EUROPA {
      * @param ancestor The candidate ancestor type. Must be a defined objectType.
      * @see isObjectType
      */
-    bool isA(const LabelStr& descendant, const LabelStr& ancestor) const;
+    bool isA(const std::string& descendant, const std::string& ancestor) const;
 
     /**
      * @brief Tests if the given type has a parent.
@@ -175,20 +169,20 @@ namespace EUROPA {
      * @return true if it does, otherwise false.
      * @see getParent, isA
      */
-    bool hasParent(const LabelStr& objectType) const;
+    bool hasParent(const std::string& objectType) const;
 
     /**
      * @brief Obtains the parent of a given type, if there is one. Will error out if it has no parent.
      * @param objectType the input type for which to obtain the parent
      * @see hasParent, isA
      */
-    const LabelStr getParent(const LabelStr& objectType) const;
+    const std::string getParent(const std::string& objectType) const;
 
     /**
      * @brief Obtains all the Object Types in the Schema.
-     * @return a const ref to a set of LabelStr (each of which is the name of an  ObjectType)
+     * @return a const ref to a set of std::string (each of which is the name of an  ObjectType)
      */
-    const LabelStrSet& getAllObjectTypes() const;
+    const std::set<std::string>& getAllObjectTypes() const;
 
     /**
      * @brief Obtains the set of all ObjectTypes that can be matched with the given object type.
@@ -196,42 +190,41 @@ namespace EUROPA {
      * @return results All matchable classes in the schema. Includes objectType and all super classes.
      * @see hasParent, getParent
      */
-    const std::vector<LabelStr>&  getAllObjectTypes(const LabelStr& objectType);
+    const std::vector<std::string>&  getAllObjectTypes(const std::string& objectType);
 
      /**
-     * @brief Obtains the set of values for an enumeration.
+     * @brief Obtains the set of values for an enumeration.  Calling this function with a
+     *        name not of an enumeration is an error.
      * @param enumName enumeration type name.
      * @return a const ref to the set of values for enumName.
-     * @error !isEnum(enumName).
      */
-    const std::set<edouble>& getEnumValues(const LabelStr& enumName) const;
+    const std::set<edouble>& getEnumValues(const std::string& enumName) const;
 
     /**
      * @brief Obtains the enum name for an enum value
      * @param value enum value to be looked up
      */
-    const LabelStr& getEnumForValue(edouble value) const;
+    const std::string& getEnumForValue(edouble value) const;
 
     /**
-     * @brief Obtain the set of predicates for a given object type.
+     * @brief Obtain the set of predicates for a given object type.  Errors if objectType
+     *        doesn't name an object type.
      * @param objectType The ObjectType to use
-     * @return a const ref to a set of LabelStr (each of which is the name of a Predicate)
      * @see addObjectType, isType
-     * @error !isType(objecttype)
      */
-    void getPredicates(const LabelStr& objectType, std::set<LabelStr>& results) const;
+    void getPredicates(const std::string& objectType, std::set<std::string>& results) const;
 
     /**
      * @brief Obtain the entire set of predicates.
      * @param results The set into which the predicates are put.
      */
 
-    void getPredicates(std::set<LabelStr>& results) const;
+    void getPredicates(std::set<std::string>& results) const;
 
     /**
      * @brief Test if an object type has any predicates
      */
-    bool hasPredicates(const LabelStr& objectType);
+    bool hasPredicates(const std::string& objectType);
 
     /**
      * @brief Helper method to compose a parent string
@@ -239,80 +232,78 @@ namespace EUROPA {
      * @param predStr The result. Must be initially empty
      * @return true if it has a parent, othwerise false
      */
-    bool makeParentPredicateString(const LabelStr& predicate, std::string& predStr) const;
+    bool makeParentPredicateString(const std::string& predicate, std::string& predStr) const;
 
     /**
-     * @brief Obtain the object type for the given predicate.
+     * @brief Obtain the object type for the given predicate.  Errors if predicate doesn't
+     *        name an existing predicate.
      * @param predicate The predicate to use
      * @see addPredicate, isPredicateDefined
-     * @error !isPredicateDefined(predicate)
      */
-    const LabelStr getObjectTypeForPredicate(const LabelStr& predicate) const;
+    const std::string getObjectTypeForPredicate(const std::string& predicate) const;
 
     /**
      * @brief Gets the index of a named member in a types member list.
      * @param type the type to search
      * @param memberName the name of the member
      */
-    unsigned int getIndexFromName(const LabelStr& type, const LabelStr& memberName) const;
+    unsigned int getIndexFromName(const std::string& type, const std::string& memberName) const;
 
     /**
      * @brief Gets the name of a member from a types member list.
      * @param type the type to search
      * @param index the index of the member
      */
-    const LabelStr getNameFromIndex(const LabelStr& type, unsigned int index) const;
+    const std::string getNameFromIndex(const std::string& type, unsigned int index) const;
 
     /**
      * @brief Gets the type of the enumeration to which the given member belongs
      * @param member the member
      */
-    const LabelStr getEnumFromMember(const LabelStr& member) const;
+    const std::string getEnumFromMember(const LabelStr& member) const;
 
     /**
-     * @brief Gets the number of parameters in a predicate
+     * @brief Gets the number of parameters in a predicate.  Error: !isPredicateDefined(predicate)
      * @param predicate the name of the predicate
-     * @error !isPredicateDefined(predicate)
      */
-    unsigned int getParameterCount(const LabelStr& predicate) const;
+    unsigned long getParameterCount(const std::string& predicate) const;
 
     /**
-     * @brief Gets the type of parameter at a particular index location in a predicate
+     * @brief Gets the type of parameter at a particular index location in a predicate.
+     *        Errors: !isPredicateDefined(predicate)
      * @param predicate the name of the predicate
      * @param paramIndex the index of the parameter
-     * @error !isPredicateDefined(predicate)
      */
-    const LabelStr getParameterType(const LabelStr& predicate, unsigned int paramIndex) const;
+    const std::string getParameterType(const std::string& predicate, unsigned int paramIndex) const;
 
     /**
      * @brief Introduce a primitive type name to be used
      */
-    void addPrimitive(const LabelStr& primitiveName);
+    void addPrimitive(const std::string& primitiveName);
 
     /**
      * @brief Declare an object type. The type can be referenced from now on.
      * I'ts the responsibility of the client to make sure that addObjectType will be called for this type eventually
      *
      */
-    void declareObjectType(const LabelStr& objectType);
+    void declareObjectType(const std::string& objectType);
 
     /**
      * @brief Add an object type. It must not be present already.
      */
-    void addObjectType(const LabelStr& objectType);
+    void addObjectType(const std::string& objectType);
 
     /**
      * @brief Add an object type as a derived type from the parent.
      */
-    void addObjectType(const LabelStr& objectType,
-                       const LabelStr& parent);
+    void addObjectType(const std::string& objectType,
+                       const std::string& parent);
 
     /**
-     * @brief Adds a predicate.
+     * @brief Adds a predicate.  Errors: !isObjectType(prefix), isPredicateDefined(suffix)
      * @param predicate The fully qualified name of the predicate. Must be of the form <prefix>.<suffix>
-     * @error !isObjectType(prefix), isPredicateDefined(suffix)
      */
-    void addPredicate(const LabelStr& predicate);
+    void addPredicate(const std::string& predicate);
 
     /**
      * @brief Indicates a composition of members
@@ -321,91 +312,90 @@ namespace EUROPA {
      * @param memberName The name of the composed member
      * @return The indexed position of the parameter in the predicate list of parameters.
      */
-    unsigned int addMember(const LabelStr& parentObjectType,
-				   const LabelStr& memberType,
-				   const LabelStr& memberName);
+    unsigned long addMember(const std::string& parentObjectType,
+                            const std::string& memberType,
+                            const std::string& memberName);
 
     /**
      * @brief Introduces a user defined enumeration type.
      * @param enumName The name of the enumeration.
      */
-    void addEnum(const LabelStr& enumName);
+    void addEnum(const std::string& enumName);
 
     /**
      * @brief Add a member to a custom defined enumeration
      * @param enumName The name of the enumeration
      * @param enumValue The member to be added
      */
-    void addValue(const LabelStr& enumName, edouble enumValue);
+    void addValue(const std::string& enumName, edouble enumValue);
 
-    void registerEnum(const char* enumName, const EnumeratedDomain& domain);
+    void registerEnum(const std::string& enumName, const EnumeratedDomain& domain);
 
     /**
      * @brief Obtain a list of names of enumerations
      * @param results a list of enumeration names
      */
-    void getEnumerations(std::list<LabelStr>& results) const;
+    void getEnumerations(std::list<std::string>& results) const;
 
     /**
      * @brief Output contents to the given stream
      */
     void write (ostream& os) const;
 
-    const CESchemaId& getCESchema() const { return m_ceSchema; }
+    const CESchemaId getCESchema() const { return m_ceSchema; }
 
     // TODO: ObjectType is replacing ObjectFactory
-    void registerObjectType(const ObjectTypeId& objType);
-    const ObjectTypeId& getObjectType(const LabelStr& objType);
-    ObjectFactoryId getObjectFactory(const LabelStr& objectType, const std::vector<const Domain*>& arguments, const bool doCheckError = true);
+    void registerObjectType(const ObjectTypeId objType);
+    const ObjectTypeId getObjectType(const std::string& objType);
+    ObjectFactoryId getObjectFactory(const std::string& objectType, const std::vector<const Domain*>& arguments, const bool doCheckError = true);
 
-    void registerTokenType(const TokenTypeId& tokenType);
-    TokenTypeId getTokenType(const LabelStr& tokenType);
-    TokenTypeId getParentTokenType( const LabelStr& tokenType, const LabelStr& parentObjType);
+    void registerTokenType(const TokenTypeId tokenType);
+    TokenTypeId getTokenType(const std::string& tokenType);
+    TokenTypeId getParentTokenType( const std::string& tokenType, const std::string& parentObjType);
 
     bool hasTokenTypes() const;
 
-    void registerMethod(const MethodId& m);
-    MethodId getMethod(const LabelStr& methodName, const DataTypeId& targetType, const std::vector<DataTypeId>& argTypes);
+    void registerMethod(const MethodId m);
+    MethodId getMethod(const std::string& methodName, const DataTypeId targetType, const std::vector<DataTypeId>& argTypes);
 
     std::vector<TokenTypeId> getTypeSupporters( TokenTypeId type );
 
     //PSSchema methods:
     PSList<std::string> getAllPredicates() const;
-    PSList<std::string> getMembers(const std::string& objectType) const;
-    bool hasMember(const std::string& parentType, const std::string& memberName) const;
+    PSList<std::string> getObjectMembers(const std::string& objectType) const;
 
     PSList<PSObjectType*> getAllPSObjectTypes() const;
     PSList<PSTokenType*>  getPSTokenTypesByAttr( int attrMask ) const;
 
   protected:
     SchemaId m_id;
-    const LabelStr m_name;
-    const CESchemaId& m_ceSchema;
+    const std::string m_name;
+    const CESchemaId m_ceSchema;
     const ObjectTypeMgrId m_objectTypeMgr;
     const TokenTypeMgrId m_tokenTypeMgr;
-    std::map<edouble, MethodId> m_methods; // TODO: define methodMgr instead of keeping a map here
+    std::map<std::string, MethodId> m_methods; // TODO: define methodMgr instead of keeping a map here
 
     // TODO: Drop these. Enums have been deprecated
-    LabelStr_ValueSet_Map enumValues;
-    std::map<edouble, LabelStr> enumValuesToEnums;
+    std::map<std::string, std::set<edouble> > enumValues;
+    std::map<edouble, std::string> enumValuesToEnums;
 
     // TODO: get rid of all data members from this point on. There are object-oriented abstractions in place now
     // that hold the same information
-    LabelStrSet objectTypes;
-    LabelStrSet predicates;
-    LabelStrSet primitives;
+    std::set<std::string> objectTypes;
+    std::set<std::string> predicates;
+    std::set<std::string> primitives;
 
-    std::map<edouble, NameValueVector> membershipRelation; /*! All type compositions */
-    std::map<edouble, LabelStr> childOfRelation; /*! Required to answer the getParent query */
-    LabelStr_LabelStrSet_Map objectPredicates; /*! All predicates by object type */
-    LabelStrSet typesWithNoPredicates; /*! Cache for lookup efficiently */
-    std::map<edouble, std::vector<LabelStr> > allObjectTypes; /*! Cache to retrieve allObjectTypes by sub-class */
+    std::map<std::string, NameValueVector> membershipRelation; /*! All type compositions */
+    std::map<std::string, std::string> childOfRelation; /*! Required to answer the getParent query */
+    std::map<std::string, std::set<std::string> > objectPredicates; /*! All predicates by object type */
+    std::set<std::string> typesWithNoPredicates; /*! Cache for lookup efficiently */
+    std::map<std::string, std::vector<std::string> > allObjectTypes; /*! Cache to retrieve allObjectTypes by sub-class */
 
-    mutable std::set<edouble> m_predTrueCache, m_predFalseCache; /**< Caches from isPredicate, now useful and not static . */
-    mutable std::set<edouble> m_hasParentCache; /**< Cache from hasParent, now useful and not static */
+    mutable std::set<std::string> m_predTrueCache, m_predFalseCache; /**< Caches from isPredicate, now useful and not static . */
+    mutable std::set<std::string> m_hasParentCache; /**< Cache from hasParent, now useful and not static */
 
     Schema(const Schema&); /**< NO IMPL */
-    static const std::set<LabelStr>& getBuiltInVariableNames();
+    static const std::set<std::string>& getBuiltInVariableNames();
 
   };
 

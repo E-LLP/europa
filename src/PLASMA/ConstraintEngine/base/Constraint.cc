@@ -10,67 +10,68 @@
 
 namespace EUROPA {
 
-  Constraint::Constraint(const LabelStr& name,
-			 const LabelStr& propagatorName,
-			 const ConstraintEngineId& constraintEngine,
-			 const std::vector<ConstrainedVariableId>& variables)
+Constraint::Constraint(const std::string& name,
+                       const std::string& propagatorName,
+                       const ConstraintEngineId constraintEngine,
+                       const std::vector<ConstrainedVariableId>& variables)
     : Entity()
     , m_name(name)
     , m_constraintEngine(constraintEngine)
     , m_variables(variables)
     , m_violationExpl("")
     , m_id(this)
+    , m_propagator()
     , m_isUnary(true)
     , m_createdBy("UNKNOWN")
     , m_deactivationRefCount(0)
     , m_isRedundant(false)
-   {
-      check_error(m_constraintEngine.isValid());
-      check_error(!m_variables.empty());
+{
+  check_error(m_constraintEngine.isValid());
+  check_error(!m_variables.empty());
 
-      m_constraintEngine->add(m_id, propagatorName);
-      //m_entityId = m_id;
+  m_constraintEngine->add(m_id, propagatorName);
+  //m_entityId = m_id;
 
-      debugMsg("Constraint:Constraint",
-              "Creating constraint " << getKey() << ":" << name.toString()
-              << " propagator: " << propagatorName.toString()
-              << " arity: " << variables.size()
-              << " violationExpl: " << m_violationExpl.toString()
-      );
+  debugMsg("Constraint:Constraint",
+           "Creating constraint " << getKey() << ":" << name
+           << " propagator: " << propagatorName
+           << " arity: " << variables.size()
+           << " violationExpl: " << m_violationExpl
+           );
 
-      check_error(isValid());
+  check_error(isValid());
 
-      int variableCount = 0;
-      for (unsigned int i = 0; i < m_variables.size(); i++) {
+  int variableCount = 0;
+  for (unsigned int i = 0; i < m_variables.size(); i++) {
 
-          // To support determining if it is in fact a Unary, we test for the possible
-          // volatility of a variable. Extend this when locking comes on stream!
-          if(!m_variables[i]->baseDomain().isSingleton())
-              variableCount++;
+    // To support determining if it is in fact a Unary, we test for the possible
+    // volatility of a variable. Extend this when locking comes on stream!
+    if(!m_variables[i]->baseDomain().isSingleton())
+      variableCount++;
 
-          if(!m_variables[i]->isActive())
-              m_deactivationRefCount++;
+    if(!m_variables[i]->isActive())
+      m_deactivationRefCount++;
 
-          checkError(m_variables[i].isValid(),
-                  "The argIndex " << i << " is not a valid variable for constraint " << name.toString());
+    checkError(m_variables[i].isValid(),
+               "The argIndex " << i << " is not a valid variable for constraint " << name);
 
-          // It is important that the call to add the constraint is only made after the deactivation reference
-          // count has been adjusted since the former effects the active status of the constraint and that may be used by
-          // a handler in figuring how to treat the constraint
-          m_variables[i]->addConstraint(m_id, i);
-      }
-
-      if(variableCount > 1)
-          m_isUnary = false;
-
-      // Update if redundant immediately
-      notifyBaseDomainRestricted(m_variables[0]);
-
-      if(!isActive()){
-          m_constraintEngine->notifyDeactivated(m_id);
-          handleDeactivate();
-      }
+    // It is important that the call to add the constraint is only made after the deactivation reference
+    // count has been adjusted since the former effects the active status of the constraint and that may be used by
+    // a handler in figuring how to treat the constraint
+    m_variables[i]->addConstraint(m_id, i);
   }
+
+  if(variableCount > 1)
+    m_isUnary = false;
+
+  // Update if redundant immediately
+  notifyBaseDomainRestricted(m_variables[0]);
+
+  if(!isActive()){
+    m_constraintEngine->notifyDeactivated(m_id);
+    handleDeactivate();
+  }
+}
 
   Constraint::~Constraint(){
     debugMsg("Constraint:~Constraint", Entity::toString() << " Id=" << m_id);
@@ -85,7 +86,7 @@ namespace EUROPA {
   }
 
   void Constraint::handleDiscard(){
-    debugMsg("Constraint:handleDiscard", getName().toString() << "(" << getKey() << ") " << m_id);
+    debugMsg("Constraint:handleDiscard", getName() << "(" << getKey() << ") " << m_id);
 
     if(!Entity::isPurging()){
       check_error(isValid());
@@ -109,16 +110,16 @@ namespace EUROPA {
 
   std::string Constraint::getViolationExpl() const
   {
-      if (m_violationExpl.toString().length() > 0)
-          return m_violationExpl.toString();
+      if (m_violationExpl.length() > 0)
+          return m_violationExpl;
 
       std::ostringstream os;
 
-      os << getName().toString() << "(";
+      os << getName() << "(";
       for(unsigned int i=0;i<m_variables.size();i++) {
           if (i > 0)
               os << ",";
-          std::string name = m_variables[i]->getName().toString();
+          std::string name = m_variables[i]->getName();
           if (name.substr(0,4) != "$VAR")
               os << name << "(" << m_variables[i]->getKey() << ")";
           else
@@ -134,37 +135,36 @@ namespace EUROPA {
       m_violationExpl = msg;
   }
 
-  PSList<PSVariable*> Constraint::getVariables() const
-  {
-	  PSList<PSVariable*> retval;
-	  for(size_t i = 0; i < m_variables.size(); ++i)
-	  {
-		  ConstrainedVariableId id = m_variables[i];
-		  retval.push_back((PSVariable *) id);
-	  }
-	  return retval;
+PSList<PSVariable*> Constraint::getVariables() const {
+  PSList<PSVariable*> retval;
+  for(std::vector<ConstrainedVariableId>::const_iterator it = m_variables.begin();
+      it != m_variables.end(); ++it) {
+    ConstrainedVariableId id = *it;
+    retval.push_back(dynamic_cast<PSVariable *>(static_cast<ConstrainedVariable*>(id)));
   }
+  return retval;
+}
 
-  const ConstraintId& Constraint::getId() const {
+  const ConstraintId Constraint::getId() const {
     return m_id;
   }
 
-  const LabelStr& Constraint::getName() const {return m_name;}
+const std::string& Constraint::getName() const {return m_name;}
 
-  const PropagatorId& Constraint::getPropagator() const {return m_propagator;}
+  const PropagatorId Constraint::getPropagator() const {return m_propagator;}
 
   const std::vector<ConstrainedVariableId>& Constraint::getScope() const {return m_variables;}
 
-  const LabelStr& Constraint::getCreatedBy() const {return m_createdBy;}
+const std::string& Constraint::getCreatedBy() const {return m_createdBy;}
 
-  void Constraint::setPropagator(const PropagatorId& propagator){
+  void Constraint::setPropagator(const PropagatorId propagator){
     check_error(m_propagator.isNoId());
     check_error(propagator->getConstraintEngine() == m_constraintEngine);
 
     m_propagator = propagator;
   }
 
-  bool Constraint::isVariableOf(const ConstrainedVariableId& variable){
+  bool Constraint::isVariableOf(const ConstrainedVariableId variable){
     std::vector<ConstrainedVariableId>::iterator it = m_variables.begin();
     while(it !=  m_variables.end()){
       if (*it == variable)
@@ -185,9 +185,9 @@ namespace EUROPA {
     	m_variables[i]->setCurrentPropagatingConstraint(ConstraintId::noId());
   }
 
-  void Constraint::execute(const ConstrainedVariableId& variable,
-				 int argIndex,
-				 const DomainListener::ChangeType& changeType) {
+  void Constraint::execute(const ConstrainedVariableId variable,
+                           unsigned int argIndex,
+                           const DomainListener::ChangeType& changeType) {
 
    for(unsigned int i=0;i<m_variables.size();i++)
     	m_variables[i]->setCurrentPropagatingConstraint(m_id);
@@ -198,21 +198,22 @@ namespace EUROPA {
     	m_variables[i]->setCurrentPropagatingConstraint(ConstraintId::noId());
   }
 
-  void Constraint::handleExecute(const ConstrainedVariableId& variable,
-				 int argIndex,
-				 const DomainListener::ChangeType& changeType) {
+  void Constraint::handleExecute(const ConstrainedVariableId,
+				 unsigned int,
+				 const DomainListener::ChangeType&) {
     handleExecute();
   }
 
-  bool Constraint::canIgnore(const ConstrainedVariableId& variable,
-			     int argIndex,
-			     const DomainListener::ChangeType& changeType) {
+  bool Constraint::canIgnore(const ConstrainedVariableId,
+			     unsigned int,
+			     const DomainListener::ChangeType&) {
     return false;
   }
 
-  const std::vector<ConstrainedVariableId>& Constraint::getModifiedVariables(const ConstrainedVariableId& variable) const {
-    return getScope();
-  }
+const std::vector<ConstrainedVariableId>&
+Constraint::getModifiedVariables(const ConstrainedVariableId) const {
+  return getScope();
+}
 
   const std::vector<ConstrainedVariableId>& Constraint::getModifiedVariables() const {
     return getScope();
@@ -222,7 +223,7 @@ namespace EUROPA {
    * @todo Figure a way to propagate first and deactivate only after safe
    * propagation.
    */
-  void Constraint::notifyBaseDomainRestricted(const ConstrainedVariableId& var) {
+  void Constraint::notifyBaseDomainRestricted(const ConstrainedVariableId var) {
     debugMsg("Constraint:notifyBaseDomainRestricted",
 	     "Base domain of " << var->toString() << " restricted in " << m_id->toString());
 
@@ -241,7 +242,7 @@ namespace EUROPA {
   /**
    * @brief Passed the variable to allow a quick exit test
    */
-  bool Constraint::testIsRedundant(const ConstrainedVariableId& var) const {
+  bool Constraint::testIsRedundant(const ConstrainedVariableId var) const {
 
     if(var.isId() && (!var->baseDomain().isSingleton() || var->baseDomain().isOpen()))
       return false;
@@ -260,7 +261,7 @@ namespace EUROPA {
     return true;
   }
 
-  Domain& Constraint::getCurrentDomain(const ConstrainedVariableId& var) {
+  Domain& Constraint::getCurrentDomain(const ConstrainedVariableId var) {
     check_error(var.isValid());
 
     return var->getCurrentDomain();
@@ -322,7 +323,7 @@ namespace EUROPA {
 	  m_propagator->getConstraintEngine()->getViolationMgr().removeViolatedConstraint(m_id);
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1){
     std::vector<ConstrainedVariableId> scope;
     check_error(arg1.isValid());
 
@@ -331,8 +332,8 @@ namespace EUROPA {
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2){
     check_error(arg1.isValid());
     check_error(arg2.isValid());
 
@@ -341,88 +342,88 @@ namespace EUROPA {
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3){
     check_error(arg3.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2);
     scope.push_back(arg3);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3,
-					       const ConstrainedVariableId& arg4){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3,
+					       const ConstrainedVariableId arg4){
     check_error(arg4.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3);
     scope.push_back(arg4);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3,
-					       const ConstrainedVariableId& arg4,
-					       const ConstrainedVariableId& arg5){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3,
+					       const ConstrainedVariableId arg4,
+					       const ConstrainedVariableId arg5){
     check_error(arg5.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3, arg4);
     scope.push_back(arg5);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3,
-					       const ConstrainedVariableId& arg4,
-					       const ConstrainedVariableId& arg5,
-					       const ConstrainedVariableId& arg6){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3,
+					       const ConstrainedVariableId arg4,
+					       const ConstrainedVariableId arg5,
+					       const ConstrainedVariableId arg6){
     check_error(arg6.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3, arg4, arg5);
     scope.push_back(arg6);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3,
-					       const ConstrainedVariableId& arg4,
-					       const ConstrainedVariableId& arg5,
-					       const ConstrainedVariableId& arg6,
-					       const ConstrainedVariableId& arg7){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3,
+					       const ConstrainedVariableId arg4,
+					       const ConstrainedVariableId arg5,
+					       const ConstrainedVariableId arg6,
+					       const ConstrainedVariableId arg7){
     check_error(arg7.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3, arg4, arg5, arg6);
     scope.push_back(arg7);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-					       const ConstrainedVariableId& arg2,
-					       const ConstrainedVariableId& arg3,
-					       const ConstrainedVariableId& arg4,
-					       const ConstrainedVariableId& arg5,
-					       const ConstrainedVariableId& arg6,
-					       const ConstrainedVariableId& arg7,
-					       const ConstrainedVariableId& arg8){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+					       const ConstrainedVariableId arg2,
+					       const ConstrainedVariableId arg3,
+					       const ConstrainedVariableId arg4,
+					       const ConstrainedVariableId arg5,
+					       const ConstrainedVariableId arg6,
+					       const ConstrainedVariableId arg7,
+					       const ConstrainedVariableId arg8){
     check_error(arg8.isValid());
     std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
     scope.push_back(arg8);
     return scope;
   }
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-  					       const ConstrainedVariableId& arg2,
-  					       const ConstrainedVariableId& arg3,
-  					       const ConstrainedVariableId& arg4,
-  					       const ConstrainedVariableId& arg5,
-  					       const ConstrainedVariableId& arg6,
-  					       const ConstrainedVariableId& arg7,
-  					       const ConstrainedVariableId& arg8,
-					       const ConstrainedVariableId& arg9,
-					       const ConstrainedVariableId& arg10,
-					       const ConstrainedVariableId& arg11,
-					       const ConstrainedVariableId& arg12,
-					       const ConstrainedVariableId& arg13){
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+  					       const ConstrainedVariableId arg2,
+  					       const ConstrainedVariableId arg3,
+  					       const ConstrainedVariableId arg4,
+  					       const ConstrainedVariableId arg5,
+  					       const ConstrainedVariableId arg6,
+  					       const ConstrainedVariableId arg7,
+  					       const ConstrainedVariableId arg8,
+					       const ConstrainedVariableId arg9,
+					       const ConstrainedVariableId arg10,
+					       const ConstrainedVariableId arg11,
+					       const ConstrainedVariableId arg12,
+					       const ConstrainedVariableId arg13){
       check_error(arg13.isValid());
       std::vector<ConstrainedVariableId> scope =  makeScope(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
       scope.push_back(arg9);
@@ -447,8 +448,8 @@ namespace EUROPA {
       sstr << " ARG[" << i++ << "]:" << var->toLongString() << std::endl;
     }
 
-    if (m_violationExpl.toString().length()>0)
-        sstr << "{ViolationExpl:" << m_violationExpl.toString() << "}";
+    if (m_violationExpl.length()>0)
+        sstr << "{ViolationExpl:" << m_violationExpl << "}";
 
     return sstr.str();
   }

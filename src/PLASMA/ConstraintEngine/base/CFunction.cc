@@ -20,15 +20,16 @@ namespace EUROPA {
 	  m_id.remove();
   }
 
-  const CFunctionId& CFunction::getId() const
+  const CFunctionId CFunction::getId() const
   {
 	  return m_id;
   }
 
-  const LabelStr& CFunction::getName()
-  {
-     return m_name;
-  }
-
+const std::string& CFunction::getName() {
+  return m_name;
 }
+
+void CFunction::checkArgTypes(const std::vector<DataTypeId>&) {}
+}
+
 

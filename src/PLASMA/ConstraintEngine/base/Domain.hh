@@ -1,5 +1,5 @@
-#ifndef _H_Domain
-#define _H_Domain
+#ifndef H_Domain
+#define H_Domain
 
 /**
  * @file Domain.hh
@@ -36,13 +36,10 @@
  * @see Variable, Constraint
  */
 #include "ConstraintEngineDefs.hh"
-#include "LabelStr.hh"
 #include "DomainListener.hh"
 #include "Number.hh"
 #include <list>
-#include <map>
 #include <string>
-#include <set>
 
 #ifdef EUROPA_FAST
 #define safeConversion(value) (value)
@@ -55,6 +52,8 @@
 #endif
 
 namespace EUROPA {
+class LabelStr;
+
   using std::ostream;
 
   // TODO!: drop this?
@@ -257,7 +256,7 @@ namespace EUROPA {
 
     /**
      * @brief Remove the given element form the domain.
-     * @param value. The value to be removed.
+     * @param value The value to be removed.
      * @note If the value was in the domain, this call will generate a value removal event.
      * @see DomainListener::VALUE_REMOVED
      */
@@ -292,7 +291,7 @@ namespace EUROPA {
      * @note Can only be called on domains that have no listeners attached,
      * since it will not cause propagation. It is more of a utility.
      */
-    virtual Domain& operator=(const Domain& dom) {
+    virtual Domain& operator=(const Domain&) {
       return(*this);
     }
 
@@ -316,14 +315,14 @@ namespace EUROPA {
     /**
      * @brief Test if this domain is a subset of dom.
      * @param dom the domain tested against.
-     * @param true if all elements of this domain are in dom. Otherwise false.
+     * @return true if all elements of this domain are in dom. Otherwise false.
      */
     virtual bool isSubsetOf(const Domain& dom) const = 0;
 
     /**
      * @brief Test if the intersection between this domain and the given domain is empty.
      * @param dom the domain tested against.
-     * @param true if any elements of this domain are in dom. Otherwise false.
+     * @return true if any elements of this domain are in dom. Otherwise false.
      */
     virtual bool intersects(const Domain& dom) const = 0;
 
@@ -343,13 +342,13 @@ namespace EUROPA {
      * Will error out if that is not the case.
      * @param listener the listener to attach.
      */
-    virtual void setListener(const DomainListenerId& listener);
+    virtual void setListener(const DomainListenerId listener);
 
     /**
      * @brief Accessor for the listener.
      * @return the listener. May be noId() if no listener attached
      */
-    virtual const DomainListenerId& getListener() const;
+    virtual const DomainListenerId getListener() const;
 
     /**
      * "Deeply" copy the concrete C++ object into new memory and return a pointer to it.
@@ -374,10 +373,10 @@ namespace EUROPA {
      */
     static bool canBeCompared(const Domain& domx, const Domain& domy);
 
-    const DataTypeId& getDataType() const;
+    const DataTypeId getDataType() const;
 
     // TODO: all these just delegate to the data type, should be dropped eventually, preserved for now for backwards compatibility
-    const LabelStr& getTypeName() const;
+    const std::string& getTypeName() const;
     bool isSymbolic() const;
     bool isEntity() const;
     bool isNumeric() const;
@@ -424,13 +423,13 @@ namespace EUROPA {
   protected:
     /**
      * @brief Constructor.
+     * @param dataType indicates the type name to use
+     * @param enumerated true if this is an explicit enumeration.
      * @param closed indicates if the domain is to be dynamic or closed on construction.  Once closed, no
      * additions to extend the contents of the domain will be permitted.
-     * @param enumerated true if this is an explicit enumeration.
-     * @param typeName indicates the type name to use
      * @todo Review how semantics of closed can be enforced in operations.
      */
-    Domain(const DataTypeId& dataType, bool enumerated, bool closed);
+    Domain(const DataTypeId dataType, bool enumerated, bool closed);
 
     /**
      * @brief Copy Constructor
@@ -461,7 +460,7 @@ namespace EUROPA {
      */
     static void assertSafeComparison(const Domain& domA, const Domain& domB);
 
-    void setDataType(const DataTypeId& dt);
+    void setDataType(const DataTypeId dt);
     friend class RestrictedDT;
 
     DataTypeId m_dataType;

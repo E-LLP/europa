@@ -1,5 +1,5 @@
-#ifndef _H_TimetableProfile
-#define _H_TimetableProfile
+#ifndef H_TimetableProfile
+#define H_TimetableProfile
 
 #include "ResourceDefs.hh"
 #include "Profile.hh"
@@ -11,7 +11,7 @@ namespace EUROPA {
     public:
       TimetableProfile(const PlanDatabaseId db, const FVDetectorId flawDetector);
 
-      void getTransactionsToOrder(const InstantId& inst, std::vector<TransactionId>& results);
+      void getTransactionsToOrder(const InstantId inst, std::vector<TransactionId>& results);
     protected:
 
     	/**

@@ -28,10 +28,12 @@
 #include "STNTemporalAdvisor.hh"
 #include "Reusable.hh"
 #include "DurativeTokens.hh"
+#include "TestUtils.hh"
 
 #include <iostream>
 #include <string>
 #include <list>
+#include <boost/cast.hpp>
 
 using namespace EUROPA;
 
@@ -47,8 +49,8 @@ class ResourceTestEngine  : public EngineBase
 
 #define RESOURCE_DEFAULT_SETUP(ce, db, autoClose) \
     ResourceTestEngine rte; \
-    ConstraintEngine& ce = *((ConstraintEngine*)rte.getComponent("ConstraintEngine")); \
-    PlanDatabase& db = *((PlanDatabase*)rte.getComponent("PlanDatabase")); \
+    ConstraintEngine& ce = *boost::polymorphic_cast<ConstraintEngine*>(rte.getComponent("ConstraintEngine")); \
+    PlanDatabase& db = *boost::polymorphic_cast<PlanDatabase*>(rte.getComponent("PlanDatabase")); \
     if (autoClose) \
       db.close();
 
@@ -77,8 +79,8 @@ private:
 class DummyDetector : public FVDetector {
 public:
   DummyDetector(const ResourceId res) : FVDetector(res) {};
-  bool detect(const InstantId inst) {return false;}
-  void initialize(const InstantId inst) {}
+  bool detect(const InstantId ) {return false;}
+  void initialize(const InstantId ) {}
   void initialize() {}
 
   virtual PSResourceProfile* getFDLevelProfile() { return NULL; }
@@ -223,7 +225,7 @@ private:
     return true;
   }
 
-  static void executeScenario0( Profile& profile, ConstraintEngine& ce ) {
+  static void executeScenario0( Profile& profile, ConstraintEngine&  ) {
     // no transactions
     profile.recompute();
   }
@@ -245,22 +247,22 @@ private:
      */
 
     Variable<IntervalIntDomain> t1(ce.getId(), IntervalIntDomain(10, PLUS_INFINITY),
-                                   true, "T+");
+                                   false, true, "T+");
     Variable<IntervalIntDomain> t2(ce.getId(), IntervalIntDomain(120010, PLUS_INFINITY), 
-                                   true, "T-");
+                                   false, true, "T-");
     Variable<IntervalIntDomain> t3(ce.getId(), IntervalIntDomain(960000, PLUS_INFINITY),
-                                   true, "t-");
+                                   false, true, "t-");
     Variable<IntervalIntDomain> t4(ce.getId(), IntervalIntDomain(961200, PLUS_INFINITY), 
-                                   true, "t+");
+                                   false, true, "t+");
     
-    Variable<IntervalDomain> q1(ce.getId(), IntervalDomain(1000), true, "qT+");
-    Variable<IntervalDomain> q2(ce.getId(), IntervalDomain(1000), true, "qT-");
-    Variable<IntervalDomain> q3(ce.getId(), IntervalDomain(1), true, "qt-");    
-    Variable<IntervalDomain> q4(ce.getId(), IntervalDomain(1), true, "qt+");
+    Variable<IntervalDomain> q1(ce.getId(), IntervalDomain(1000), false, true, "qT+");
+    Variable<IntervalDomain> q2(ce.getId(), IntervalDomain(1000), false, true, "qT-");
+    Variable<IntervalDomain> q3(ce.getId(), IntervalDomain(1), false, true, "qt-");    
+    Variable<IntervalDomain> q4(ce.getId(), IntervalDomain(1), false, true, "qt+");
 
-    LessThanEqualConstraint c0(LabelStr("precedes"), LabelStr("Temporal"), ce.getId(),
+    LessThanEqualConstraint c0("precedes", "Temporal", ce.getId(),
                                makeScope(t1.getId(), t2.getId()));
-    LessThanEqualConstraint c1(LabelStr("precedes"), LabelStr("Temporal"), ce.getId(),
+    LessThanEqualConstraint c1("precedes", "Temporal", ce.getId(),
                                makeScope(t3.getId(), t4.getId()));
 
     ce.propagate();
@@ -299,15 +301,15 @@ private:
      *
      */
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 15), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 5, 15), true, "t3" );
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 5, 15), true, "t4" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 15), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 5, 15), false, true, "t3" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 5, 15), false, true, "t4" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), true, "q3" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), true, "q4" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), false, true, "q3" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), false, true, "q4" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -328,11 +330,11 @@ private:
 
   static void executeScenario2( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t2" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -348,13 +350,13 @@ private:
   }
 
   static void executeScenario3( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(  0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 10, 10), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 10, 20), true, "t3" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(  0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 10, 10), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 10, 20), false, true, "t3" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), true, "q3" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), false, true, "q3" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -372,13 +374,13 @@ private:
   }
 
   static void executeScenario4( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(  0, 5), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 10, 15), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 20, 25), true, "t3" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(  0, 5), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 10, 15), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 20, 25), false, true, "t3" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), true, "q3" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), false, true, "q3" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -397,17 +399,17 @@ private:
 
   static void executeScenario5( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t2" );
 
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
 
-    EqualConstraint c0(LabelStr("concurrent"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), t2.getId()));
+    EqualConstraint c0("concurrent", "Temporal", ce.getId() , makeScope(t1.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -443,15 +445,15 @@ private:
     edouble lowerLevels[nrInstances] = {-4,-2};
     edouble upperLevels[nrInstances] = {4,2};
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 100), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 100), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 0, 100), true, "t3" );
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 0, 100), true, "t4" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 100), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 100), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 0, 100), false, true, "t3" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 0, 100), false, true, "t4" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), true, "q3" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 2), true, "q4" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 2), false, true, "q3" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 2), false, true, "q4" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -579,7 +581,7 @@ private:
      */
     debugMsg("ResourceTest","    Case 5");
 
-    EqualConstraint c0(LabelStr("concurrent"), LabelStr("Temporal"), ce.getId() ,
+    EqualConstraint c0("concurrent", "Temporal", ce.getId() ,
                        makeScope( t3.getId(), t4.getId()));
 
     ce.propagate();
@@ -600,16 +602,16 @@ private:
   }
 
   static void executeScenario7( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t2" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(2, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(2, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 2), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
 
-    EqualConstraint c0(LabelStr("concurrent"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), t2.getId()));
+    EqualConstraint c0("concurrent", "Temporal", ce.getId() , makeScope(t1.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -624,16 +626,16 @@ private:
   }
 
   static void executeScenario8( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t2" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(2, 2), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(2, 2), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
 
-    EqualConstraint c0(LabelStr("concurrent"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), t2.getId()));
+    EqualConstraint c0("concurrent", "Temporal", ce.getId() , makeScope(t1.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -649,15 +651,15 @@ private:
 
   static void executeScenario9( Profile& profile, ConstraintEngine& ce, int nrInstances, eint itimes[], edouble lowerLevels[], edouble upperLevels[]  ) {
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 1, 3), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 12), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 9, 9), true, "t3" );
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 11, 11), true, "t4" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 1, 3), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 12), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 9, 9), false, true, "t3" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 11, 11), false, true, "t4" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), true, "q3" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), true, "q4" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 1), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), false, true, "q3" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), false, true, "q4" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  false , EntityId::noId());
@@ -694,38 +696,38 @@ private:
 	   *
 	   */
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(0,0), true, "t1" );
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), true, "q1" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain(0,0), false, true, "t1" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), false, true, "q1" );
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
 
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 10), true, "t2" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), true, "q2" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 10), false, true, "t2" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), false, true, "q2" );
     Transaction trans2( t2.getId(),  q2.getId(),  false , EntityId::noId());
 
-    LessThanEqualConstraint c0(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), t2.getId()));
+    LessThanEqualConstraint c0("precedes", "Temporal", ce.getId() , makeScope(t1.getId(), t2.getId()));
 
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain(10, 10), true, "t3" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(2, 2), true, "q3" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain(10, 10), false, true, "t3" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(2, 2), false, true, "q3" );
     Transaction trans3( t3.getId(),  q3.getId(),  true, EntityId::noId());
 
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain(100, 100), true, "t4" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(2, 2), true, "q4" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain(100, 100), false, true, "t4" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(2, 2), false, true, "q4" );
     Transaction trans4( t4.getId(),  q4.getId(),  false , EntityId::noId());
 
-    LessThanEqualConstraint c1(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t3.getId(), t4.getId()));
+    LessThanEqualConstraint c1("precedes", "Temporal", ce.getId() , makeScope(t3.getId(), t4.getId()));
 
-    Variable<IntervalIntDomain> t5( ce.getId(), IntervalIntDomain(11, 100), true, "t5" );
-    Variable<IntervalDomain> q5( ce.getId(), IntervalDomain(3, 3), true, "q5" );
+    Variable<IntervalIntDomain> t5( ce.getId(), IntervalIntDomain(11, 100), false, true, "t5" );
+    Variable<IntervalDomain> q5( ce.getId(), IntervalDomain(3, 3), false, true, "q5" );
     Transaction trans5( t5.getId(),  q5.getId(),  true, EntityId::noId());
 
-    Variable<IntervalIntDomain> t6( ce.getId(), IntervalIntDomain(12, 100), true, "t6" );
-    Variable<IntervalDomain> q6( ce.getId(), IntervalDomain(3, 3), true, "q6" );
+    Variable<IntervalIntDomain> t6( ce.getId(), IntervalIntDomain(12, 100), false, true, "t6" );
+    Variable<IntervalDomain> q6( ce.getId(), IntervalDomain(3, 3), false, true, "q6" );
     Transaction trans6( t6.getId(),  q6.getId(),  false , EntityId::noId());
 
-    LessThanEqualConstraint c2(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t5.getId(), t6.getId()));
+    LessThanEqualConstraint c2("precedes", "Temporal", ce.getId() , makeScope(t5.getId(), t6.getId()));
 
-    LessThanEqualConstraint c3(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t2.getId(), t3.getId()));
-    LessThanEqualConstraint c4(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t2.getId(), t5.getId()));
+    LessThanEqualConstraint c3("precedes", "Temporal", ce.getId() , makeScope(t2.getId(), t3.getId()));
+    LessThanEqualConstraint c4("precedes", "Temporal", ce.getId() , makeScope(t2.getId(), t5.getId()));
 
     ce.propagate();
 
@@ -756,17 +758,21 @@ private:
      *
      */
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(),
+                                    IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ),
+                                    false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(),
+                                    IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ),
+                                    false, true, "t2" );
 
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(0, PLUS_INFINITY), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(0, PLUS_INFINITY), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(0, PLUS_INFINITY), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(0, PLUS_INFINITY), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  false , EntityId::noId());
 
-    LessThanEqualConstraint c1(LabelStr("precedes"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), t2.getId()));
+    LessThanEqualConstraint c1("precedes", "Temporal", ce.getId() , makeScope(t1.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -793,19 +799,19 @@ private:
      *
      */
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), true, "t2" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY ), false, true, "t2" );
 
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(0, PLUS_INFINITY), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(0, PLUS_INFINITY), true, "q2" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(0, PLUS_INFINITY), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(0, PLUS_INFINITY), false, true, "q2" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  false , EntityId::noId());
 
 
-    Variable<IntervalIntDomain> distance( ce.getId(), IntervalIntDomain( 1, PLUS_INFINITY ), true, "distance" );
-    AddEqualConstraint c1(LabelStr("temporalDistance"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), distance.getId(), t2.getId()));
+    Variable<IntervalIntDomain> distance( ce.getId(), IntervalIntDomain( 1, PLUS_INFINITY ), false, true, "distance" );
+    AddEqualConstraint c1("temporalDistance", "Temporal", ce.getId() , makeScope(t1.getId(), distance.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -864,21 +870,21 @@ private:
      *
      */
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 9 ), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 1,10 ), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 0, 0 ), true, "t3" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 9 ), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 1,10 ), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 0, 0 ), false, true, "t3" );
 
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(3, 3), true, "q3" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(3, 3), false, true, "q3" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  false , EntityId::noId());
     Transaction trans3( t3.getId(),  q3.getId(),  true , EntityId::noId());
 
-    Variable<IntervalIntDomain> distance( ce.getId(), IntervalIntDomain( 1, PLUS_INFINITY ), true, "distance" );
-    AddEqualConstraint c1(LabelStr("temporalDistance"), LabelStr("Temporal"), ce.getId() , makeScope(t1.getId(), distance.getId(), t2.getId()));
+    Variable<IntervalIntDomain> distance( ce.getId(), IntervalIntDomain( 1, PLUS_INFINITY ), false, true, "distance" );
+    AddEqualConstraint c1("temporalDistance", "Temporal", ce.getId() , makeScope(t1.getId(), distance.getId(), t2.getId()));
 
     ce.propagate();
 
@@ -905,8 +911,8 @@ private:
 
     debugMsg("ResourceTest","    Case 1");
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10 ), true, "t1" );
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), true, "q1" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10 ), false, true, "t1" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(3, 3), false, true, "q1" );
     Transaction trans1( t1.getId(),  q1.getId(),  true, EntityId::noId());
 
     profile.addTransaction( trans1.getId() );
@@ -937,8 +943,8 @@ private:
      */
     debugMsg("ResourceTest","    Case 2");
 
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 5, 15 ), true, "t2" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), true, "q2" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain( 5, 15 ), false, true, "t2" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(3, 3), false, true, "q2" );
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
 
     profile.addTransaction( trans2.getId() );
@@ -972,8 +978,8 @@ private:
 
     debugMsg("ResourceTest","    Case 3");
 
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 20, 25  ), true, "t3" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(3, 3), true, "q3" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 20, 25  ), false, true, "t3" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(3, 3), false, true, "q3" );
     Transaction trans3( t3.getId(),  q3.getId(),  true , EntityId::noId());
 
     profile.addTransaction( trans3.getId() );
@@ -1007,8 +1013,8 @@ private:
 
     debugMsg("ResourceTest","    Case 4");
 
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain(-10, 0 ), true, "t4" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(3, 3), true, "q4" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain(-10, 0 ), false, true, "t4" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(3, 3), false, true, "q4" );
     Transaction trans4( t4.getId(),  q4.getId(),  true , EntityId::noId());
 
     profile.addTransaction( trans4.getId() );
@@ -1051,15 +1057,15 @@ private:
     DummyDetector detector(ResourceId::noId());
     Profile profile(db.getId(), detector.getId());
 
-    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), true, "t1" );
-    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 15), true, "t2" );
-    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 5, 15), true, "t3" );
-    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 5, 15), true, "t4" );
+    Variable<IntervalIntDomain> t1( ce.getId(), IntervalIntDomain( 0, 10), false, true, "t1" );
+    Variable<IntervalIntDomain> t2( ce.getId(), IntervalIntDomain(10, 15), false, true, "t2" );
+    Variable<IntervalIntDomain> t3( ce.getId(), IntervalIntDomain( 5, 15), false, true, "t3" );
+    Variable<IntervalIntDomain> t4( ce.getId(), IntervalIntDomain( 5, 15), false, true, "t4" );
 
-    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), true, "q1" );
-    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), true, "q2" );
-    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), true, "q3" );
-    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), true, "q4" );
+    Variable<IntervalDomain> q1( ce.getId(), IntervalDomain(1, 2), false, true, "q1" );
+    Variable<IntervalDomain> q2( ce.getId(), IntervalDomain(1, 1), false, true, "q2" );
+    Variable<IntervalDomain> q3( ce.getId(), IntervalDomain(1, 1), false, true, "q3" );
+    Variable<IntervalDomain> q4( ce.getId(), IntervalDomain(1, 1), false, true, "q4" );
 
     Transaction trans1( t1.getId(),  q1.getId(),  false, EntityId::noId());
     Transaction trans2( t2.getId(),  q2.getId(),  true , EntityId::noId());
@@ -1509,32 +1515,32 @@ private:
   static bool testReusableDetector() {
     RESOURCE_DEFAULT_SETUP(ce, db, false);
 
-    Reusable res(db.getId(), LabelStr("Reusable"), LabelStr("res1"), 
-                 LabelStr("ClosedWorldFVDetector"), LabelStr("IncrementalFlowProfile"),
+    Reusable res(db.getId(), "Reusable", "res1", 
+                 "ClosedWorldFVDetector", "IncrementalFlowProfile",
                  1, 1, 0);
 
     //create a token that violates the limit (i.e. consumes 2)
-    ReusableToken tok1(db.getId(), LabelStr("Reusable.uses"), 
+    ReusableToken tok1(db.getId(), "Reusable.uses", 
                        IntervalIntDomain(1), IntervalIntDomain(10),
                        IntervalIntDomain(9), IntervalDomain(2));
     CPPUNIT_ASSERT(!ce.propagate());
     tok1.discard(false);
 
     //create a token that doesn't
-    ReusableToken tok2(db.getId(), LabelStr("Reusable.uses"), 
+    ReusableToken tok2(db.getId(), "Reusable.uses", 
                        IntervalIntDomain(1, 3), IntervalIntDomain(10, 12),
                        IntervalIntDomain(9),
 		       IntervalDomain(1));
     CPPUNIT_ASSERT(ce.propagate());
         //create a token that doesn't, but must start during the previous token, causing a violation
-    ReusableToken tok3(db.getId(), LabelStr("Reusable.uses"), IntervalIntDomain(9),
+    ReusableToken tok3(db.getId(), "Reusable.uses", IntervalIntDomain(9),
                        IntervalIntDomain(11), IntervalIntDomain(2),
 		       IntervalDomain(1));
     CPPUNIT_ASSERT(!ce.propagate());
     tok3.discard(false);
     CPPUNIT_ASSERT(ce.propagate());
     //create a token that doesn't, and may start afterwards, creating a flaw
-    ReusableToken tok4(db.getId(), LabelStr("Reusable.uses"), IntervalIntDomain(10, 13), IntervalIntDomain(15, 18), IntervalIntDomain(5),
+    ReusableToken tok4(db.getId(), "Reusable.uses", IntervalIntDomain(10, 13), IntervalIntDomain(15, 18), IntervalIntDomain(5),
 		       IntervalDomain(1));
     CPPUNIT_ASSERT(ce.propagate());
     CPPUNIT_ASSERT(db.hasOrderingChoice(tok4.getId()));

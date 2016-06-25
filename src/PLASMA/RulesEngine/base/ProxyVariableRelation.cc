@@ -3,24 +3,30 @@
 
 namespace EUROPA {
 
-  ProxyVariableRelation::ProxyVariableRelation(const ConstrainedVariableId& objectVar,
-					       const ConstrainedVariableId& proxyVar,
+  ProxyVariableRelation::ProxyVariableRelation(const ConstrainedVariableId objectVar,
+					       const ConstrainedVariableId proxyVar,
 					       const std::vector<unsigned int>& path)
     : Constraint("proxyRelation", "Default", objectVar->getConstraintEngine(), makeScope(objectVar, proxyVar)),
       m_objectDomain(static_cast<ObjectDomain&>(getCurrentDomain(objectVar))),
       m_proxyDomain(static_cast<EnumeratedDomain&>(getCurrentDomain(proxyVar))),
       m_path(path),
-      m_sourceConstraintKey(0){
+      m_autoSpecified(false),
+      m_sourceConstraintKey(0),
+      m_sourceConstraint() {
     checkError(getScope().size() == ARG_COUNT, toString());
   }
 
-  ProxyVariableRelation::ProxyVariableRelation(const LabelStr& name,
-					       const LabelStr& propagatorName,
-					       const ConstraintEngineId& constraintEngine,
+  ProxyVariableRelation::ProxyVariableRelation(const std::string& name,
+					       const std::string& propagatorName,
+					       const ConstraintEngineId constraintEngine,
 					       const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_objectDomain(static_cast<ObjectDomain&>(getCurrentDomain(variables[0]))),
-      m_proxyDomain(static_cast<EnumeratedDomain&>(getCurrentDomain(variables[1]))){
+      m_proxyDomain(static_cast<EnumeratedDomain&>(getCurrentDomain(variables[1]))),
+      m_path(),
+      m_autoSpecified(false),
+      m_sourceConstraintKey(),
+      m_sourceConstraint() {
     checkError(getScope().size() == ARG_COUNT, toString());
   }
 
@@ -65,8 +71,8 @@ namespace EUROPA {
   }
 
 
-  bool ProxyVariableRelation::canIgnore(const ConstrainedVariableId& variable,
-					int argIndex,
+  bool ProxyVariableRelation::canIgnore(const ConstrainedVariableId variable,
+					unsigned int argIndex,
 					const DomainListener::ChangeType& changeType){
     // If the object variable is specified to a singleton, and the proxy variable can be specified, then
     // we will force the proxy to be set to the field value of the given object
@@ -104,11 +110,12 @@ namespace EUROPA {
     return false;
   }
 
-  void ProxyVariableRelation::setSource(const ConstraintId& sourceConstraint){
-    checkError(sourceConstraint->getName() == LabelStr("proxyRelation"), sourceConstraint->toString());
-    checkError(m_path.empty(), "Should be empty when setting up the source from " << sourceConstraint->toString());
-    m_sourceConstraint = sourceConstraint;
-  }
+void ProxyVariableRelation::setSource(const ConstraintId sourceConstraint) {
+  checkError(sourceConstraint->getName() == "proxyRelation",
+             sourceConstraint->toString());
+  checkError(m_path.empty(), "Should be empty when setting up the source from " << sourceConstraint->toString());
+  m_sourceConstraint = sourceConstraint;
+}
 
   /**
    * In the lifetime of a constraint, this should only be called at most once. It is used to lazily copy a source path under conditions
@@ -119,7 +126,8 @@ namespace EUROPA {
    */
   void ProxyVariableRelation::updatePathFromSource(){
     if(m_sourceConstraint.isId() && m_sourceConstraintKey != m_sourceConstraint->getKey()){
-      ProxyVariableRelation* proxyConstraint = (ProxyVariableRelation*) m_sourceConstraint;
+      ProxyVariableRelation* proxyConstraint =
+          id_cast<ProxyVariableRelation>(m_sourceConstraint);
       m_path = proxyConstraint->m_path;
       m_sourceConstraint = ConstraintId::noId();
     }

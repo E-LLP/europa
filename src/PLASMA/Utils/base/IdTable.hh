@@ -11,17 +11,16 @@
 //  ownership of the software is hereby transferred.  This notice shall
 //  remain on all copies of the software.
 
-#ifndef _H_IdTable
-#define _H_IdTable
+#ifndef H_IdTable
+#define H_IdTable
 
 #include <map>
-#include <iostream>
+#include <iosfwd>
 #include <string>
 #include "Number.hh"
 
 
 /**
- * @file IdTable.hh
  * @author Conor McGann
  * @brief Defines a singleton class managing allocation and deallocation of ids for pointers.
  * @date  July, 2003
@@ -44,7 +43,7 @@ namespace EUROPA {
   public:
     ~IdTable(); // deallocating statics requires public access on beos
 
-    static unsigned int size();
+    static unsigned long size();
 
     static unsigned int insert(unsigned long int id, const char* baseType);
     static void remove(unsigned long int id);
@@ -56,13 +55,13 @@ namespace EUROPA {
     static void output(std::ostream& os);
 
     // Test Support, checks for memory leaks
-	static void checkResult(bool result, unsigned int id_count);
+    static void checkResult(bool result, unsigned long id_count);
 
   protected:
     IdTable();
     static IdTable& getInstance();
     
-    std::map<unsigned long int, std::pair<unsigned int,edouble> > m_collection;  /*<! Map from pointers to keys*/
+    std::map<unsigned long int, std::pair<unsigned int,edouble> > m_collection; /**< Map from pointers to keys */
     std::map<std::string, unsigned int> m_typeCnts;
   };
 }

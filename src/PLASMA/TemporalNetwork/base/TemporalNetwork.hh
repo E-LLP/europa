@@ -10,8 +10,8 @@
 //  which it was acquired from the U.S. Government.  Neither title to nor
 //  ownership of the software is hereby transferred.  This notice shall
 //  remain on all copies of the software.
-#ifndef _H_TemporalNetwork
-#define _H_TemporalNetwork
+#ifndef H_TemporalNetwork
+#define H_TemporalNetwork
 
 #include "TemporalNetworkDefs.hh"
 #include "DistanceGraph.hh"
@@ -28,9 +28,8 @@ namespace EUROPA {
 
   class DispatchNode;
 
-  typedef Id<Tnode> TimepointId;
 
-  const TimepointId noTimepointId;
+const TimepointId noTimepointId(static_cast<Tnode*>(NULL));
 
     /**
      * @class  TemporalNetwork
@@ -56,7 +55,7 @@ namespace EUROPA {
     Bool hasDeletions;
     Int nodeCounter;
     /**
-     * @breif Used for specialized cycle detection
+     * @brief Used for specialized cycle detection
      */
     TimepointId incrementalSource;
 
@@ -108,7 +107,7 @@ namespace EUROPA {
      * @param lb return result giving lower bound of id.
      * @param ub return result giving upper bound of id.
      */
-    Void getTimepointBounds(const TimepointId& id, Time& lb, Time& ub);
+    Void getTimepointBounds(const TimepointId id, Time& lb, Time& ub);
 
   /**
      * @brief Accessor for the upper and lower bound times of a timepoint. The method
@@ -117,7 +116,7 @@ namespace EUROPA {
      * @param lb return result giving lower bound of id.
      * @param ub return result giving upper bound of id.
      */
-    Void getLastTimepointBounds(const TimepointId& id, Time& lb, Time& ub);
+    Void getLastTimepointBounds(const TimepointId id, Time& lb, Time& ub);
 
    /**
      * @brief Accessor for the Lower Timepoint bound. The method
@@ -125,7 +124,7 @@ namespace EUROPA {
      * @param id the timepoint for which you require this information.
      * @return lower bound of timepoint.
      */
-    Time getLowerTimepointBound(const TimepointId&);
+    Time getLowerTimepointBound(const TimepointId id);
 
     /**
      * @brief Accessor for the Upper Timepoint bound. The method
@@ -133,7 +132,7 @@ namespace EUROPA {
      * @param id the timepoint for which you require this information.
      * @return upper bound of timepoint.
      */
-    Time getUpperTimepointBound(const TimepointId&);
+    Time getUpperTimepointBound(const TimepointId id);
 
     /**
      * @brief Test if the STN is consistent
@@ -161,7 +160,7 @@ namespace EUROPA {
      * @param ub returns the upper bound of the distnace between src and targ
      * @param exact if true use Dijkstra's algorithim to compute exact distnace. Approximate if false
      */
-    Void calcDistanceBounds(const TimepointId& src, const TimepointId& targ, Time& lb, Time& ub, Bool exact=true);
+    Void calcDistanceBounds(const TimepointId src, const TimepointId targ, Time& lb, Time& ub, Bool exact=true);
 
     /**
      * @brief Calculate the (exact) temporal distance from one timepoint to others.  Much more efficient when many targs.
@@ -170,7 +169,7 @@ namespace EUROPA {
      * @param lbs returns the lower bounds of the distances
      * @param ubs returns the upper bounds of the distances
      */
-    Void calcDistanceBounds(const TimepointId& src,
+    Void calcDistanceBounds(const TimepointId src,
                             const std::vector<TimepointId>& targs,
                             std::vector<Time>& lbs, std::vector<Time>& ubs);
 
@@ -179,7 +178,7 @@ namespace EUROPA {
      * but only the signs of the "bounds" (that indicate precedences)
      * are meaningful.
      */
-    Void calcDistanceSigns(const TimepointId& src,
+    Void calcDistanceSigns(const TimepointId src,
                            const std::vector<TimepointId>& targs,
                            std::vector<Time>& lbs, std::vector<Time>& ubs);
 
@@ -189,29 +188,30 @@ namespace EUROPA {
      * @param id temporal constraint of interest.
      * @result two time points - the head and foot of the constraint (in that order).
      */
-    std::list<TimepointId> getConstraintScope(const TemporalConstraintId&);
+    std::list<TimepointId> getConstraintScope(const TemporalConstraintId id);
 
     /**
      * @brief Get the upperbound on the time of a temporal constraint.
      * @param id temporal constraint of interest.
      * @result Upperbound time on constraint.
      */
-    Time getConstraintUpperBound(const TemporalConstraintId&);
+    Time getConstraintUpperBound(const TemporalConstraintId id);
 
     /**
      * @brief Get the lowerbound on the time of a temporal constraint.
      * @param id temporal constraint of interest.
      * @result Lowerbound time on constraint.
      */
-    Time getConstraintLowerBound(const TemporalConstraintId&);
+    Time getConstraintLowerBound(const TemporalConstraintId id);
 
     /**
      * @brief Identify the timepoints that mark the head and foot of a temporal constraint.
      * @param constraint temporal constraint of interest.
-     * @param returns head of temporal constraint
-     * @param returns foot of temporal constraint
+     * @param source head of temporal constraint
+     * @param target foot of temporal constraint
      */
-    void getConstraintScope(const TemporalConstraintId& constraint, TimepointId& source, TimepointId& target) const;
+    void getConstraintScope(const TemporalConstraintId constraint,
+                            TimepointId& source, TimepointId& target) const;
 
     /**
      * @brief Add temporal constraint to the network
@@ -221,7 +221,7 @@ namespace EUROPA {
      * @param ub upper bound time
      * @param propagate iff true this constraint will be included in propagation.
      */
-    TemporalConstraintId addTemporalConstraint(const TimepointId& src, const TimepointId& targ,
+    TemporalConstraintId addTemporalConstraint(const TimepointId src, const TimepointId targ,
 						const Time lb, const Time ub, bool propagate = true);
     /**
      * @brief Tighten the temporal constraint to new bounds iff they are tighter.
@@ -229,14 +229,14 @@ namespace EUROPA {
      * @param newLb New lower bound
      * @param newUb New Upper bound
      */
-    Void narrowTemporalConstraint(const TemporalConstraintId& tcId, const Time newLb, const Time newUb);
+    Void narrowTemporalConstraint(const TemporalConstraintId tcId, const Time newLb, const Time newUb);
 
     /**
      * @brief Remove a constraint from the temporal network
      * @param tcId Constraint to remove
      * @param markDeleted set to true iff you want the STN's state updated to indicate a deleteation has occured. False otherwise.
      */
-    Void removeTemporalConstraint(const TemporalConstraintId& tcId, bool markDeleted = true);
+    Void removeTemporalConstraint(const TemporalConstraintId tcId, bool markDeleted = true);
 
     /**
      * @brief get the TimePointId of the origin of the STN.
@@ -253,7 +253,7 @@ namespace EUROPA {
     /**
      * @brief Delete a timepoint from the STN. Note: this must not be the origin and it must be a valid timepoint.
      */
-    Void deleteTimepoint(const TimepointId& tpId);
+    Void deleteTimepoint(const TimepointId tpId);
 
     /**
      * @brief Identify the set of timepoints that lead to an inconsistent network. Note the network must be inconsistent to call this method.
@@ -274,7 +274,7 @@ namespace EUROPA {
      * @param bound distance bound
      * @return true iff distance(form, to) < bound. False otherwise.
      */
-    Bool isDistanceLessThan (const TimepointId& from, const TimepointId& to, Time bound);
+    Bool isDistanceLessThan (const TimepointId from, const TimepointId to, Time bound);
 
     /**
      * @brief Check if distance between two timepoints is less or equal to a time bound
@@ -283,7 +283,7 @@ namespace EUROPA {
      * @param bound distance bound
      * @return true iff distance(form, to) <= bound. False otherwise.
      */
-    Bool isDistanceLessThanOrEqual (const TimepointId& from, const TimepointId& to,
+    Bool isDistanceLessThanOrEqual (const TimepointId from, const TimepointId to,
 				    Time bound);
 
   /**
@@ -295,7 +295,7 @@ namespace EUROPA {
      * @param bound distance bound
      * @return true if distance(form, to) ~< bound. False otherwise.
      */
-    Bool isDistancePossiblyLessThan (const TimepointId& from, const TimepointId& to,
+    Bool isDistancePossiblyLessThan (const TimepointId from, const TimepointId to,
 				     Time bound);
 
      /**
@@ -307,7 +307,7 @@ namespace EUROPA {
      * @brief Add node to set of updated timepoints.
      * @param node node to add.
      */
-    void handleNodeUpdate(const DnodeId& node);
+    void handleNodeUpdate(const DnodeId node);
 
     /**
      * @brief Returns the set of updated timepoints.
@@ -317,43 +317,27 @@ namespace EUROPA {
 
     /**
      * @brief Identify if timepoint is connected to the origin of the STN through edges in the network
-     * @param timepoint
+     * @param timepoint The timepoint to test
      * @return true iff timepoint has edge to the origin. False, otherwise.
      * @todo make const when we constify methods in the DistanceGraph
      */
-    bool hasEdgeToOrigin(const TimepointId& timepoint);
+    bool hasEdgeToOrigin(const TimepointId timepoint);
 
     /**
      * @brief Get unique identifier for this STN instance
      * @return unique STN identifier
      */
-    const TemporalNetworkId& getId() const;
+    const TemporalNetworkId getId() const;
 
     // For Dispatchability Processing
 
-    /**
-     * @brief
-     * @return
-     */
     std::list<TemporalConstraintId>    addDispatchConstraints();
     // Additional exec-oriented functions
 
-     /**
-     * @brief
-     * @return
-     */
     TimepointId getRingLeader(TimepointId tpId);
 
-    /**
-     * @brief
-     * @return
-     */
     std::list<TimepointId> getRingFollowers (TimepointId tpId);
 
-    /**
-     * @brief
-     * @return
-     */
     std::list<TimepointId> getRingPredecessors (TimepointId tpId);
 
     /**
@@ -371,7 +355,7 @@ namespace EUROPA {
      * used for preferred time calculations. Use noId() to turn off
      * such calculations. (PHM: Support for reftime calculations)
      */
-    void setReferenceTimepoint (TimepointId refpoint = TimepointId::noId());
+    void setReferenceTimepoint (TimepointId refpoint = TimepointId());
     TimepointId getReferenceTimepoint () { return m_refpoint; }
  
   private:
@@ -395,7 +379,7 @@ namespace EUROPA {
 
     /**
      * @brief For incremental propagation, determines whether a propagation
-     *        should be tried from head to foot or vice versa.
+     *        should be tried from head to foot or vice versa, and does first propagation
      *
      *  The supplied
      * edge must be in the direction of propagation from head to foot.
@@ -403,15 +387,10 @@ namespace EUROPA {
      * supplied) in the other direction.  Used with various
      * distance-like values.  Note that an effective prop in one
      * direction precludes one in the other direction.
-     * @return node at which incremental propogation should be tried.
+     * @return node from which to continue the propagation 
+     *         (or noId if the first prop is ineffective)
      */
-    /**
-     * @brief For incremental propagation, determines whether a propagation
-     *        is started from head to foot or vice versa, and does first
-     *        propagation.  (PHM: 06/21/2007 Recoded for efficiency.)
-     * @return node from which to continue
-     *        the propagation (or noId if first prop is ineffective).
-     */
+    //(PHM: 06/21/2007 Recoded for efficiency.)
     DnodeId startNode (TimepointId head, Time& headDistance,
                        TimepointId foot, Time& footDistance,
                        bool forwards = true);
@@ -441,28 +420,22 @@ namespace EUROPA {
      * @brief Propagates lower/upper distance bounds from src
      * using backward and forward Dijkstra propagations.
      */
-    Void propagateBoundsFrom (const TimepointId& src);
+    Void propagateBoundsFrom (const TimepointId src);
 
-    /**
-     * @brief
-     */
     Void maintainTEQ (Time lb, Time ub, TimepointId src, TimepointId targ);
 
-    /**
-     * @brief
-     */
     Void cleanupTEQ(TimepointId tpt);
 
     /**
      * @brief check if node is valid
      * @return true iff node is valid.
      */
-    Bool isValidId(const TimepointId& id);
+    Bool isValidId(const TimepointId id);
 
     /**
-     * @breif check if constraint is valid
+     * @brief check if constraint is valid
      */
-    Bool isValidId(const TemporalConstraintId& id);
+    Bool isValidId(const TemporalConstraintId id);
 
     /**
      * @brief set the consistency flag.
@@ -516,7 +489,10 @@ namespace EUROPA {
      * @ingroup TemporalNetwork
     */
 
-  class Tnode : public Dnode {
+class Tnode : public Dnode {
+private:
+  Tnode(const Tnode&);
+  Tnode& operator=(const Tnode&);
     friend class TemporalNetwork;
     friend Void keepEdge (DispatchNode* x, DispatchNode* y, Time d);
     // PHM Support for reftime calculations
@@ -538,8 +514,8 @@ namespace EUROPA {
   public:
     Tnode(TemporalNetwork* t);
     virtual ~Tnode();
-    const TemporalConstraintId& getBaseDomainConstraint() const;
-    void setBaseDomainConstraint(const TemporalConstraintId& constraint);
+    const TemporalConstraintId getBaseDomainConstraint() const;
+    void setBaseDomainConstraint(const TemporalConstraintId constraint);
     inline void clearDeletionMarker() {m_deletionMarker = false;}
     inline bool getDeletionMarker() const { return m_deletionMarker; }
     inline const Time& getLowerBound() const {return lowerBound;}
@@ -570,13 +546,15 @@ namespace EUROPA {
      * @ingroup TemporalNetwork
     */
   class Tspec : public Entity {
+private:
+    Tspec(const Tspec&);
+    Tspec& operator=(const Tspec&);
     friend class TemporalNetwork;
     Time lowerBound;
     Time upperBound;
     TimepointId head;
     TimepointId foot;
     TemporalNetwork* owner;
-    TemporalConstraintId m_id;
     unsigned int m_edgeCount;
     void handleDiscard();
 
@@ -591,16 +569,11 @@ namespace EUROPA {
      * @param edgeCount edge count
      */
     Tspec(TemporalNetwork* t, TimepointId src,TimepointId targ,Time lb,Time ub, unsigned short edgeCount)
-      :owner(t), m_id(this), m_edgeCount(edgeCount)
-    { head=src; foot=targ; lowerBound=lb; upperBound=ub;}
+        : lowerBound(lb), upperBound(ub), head(src), foot(targ), owner(t),
+          m_edgeCount(edgeCount)
+    {}
 
     virtual ~Tspec();
-
-    /**
-     * @brief return the temporal network that this Tspec is associated with
-     * @return the temporal network id
-     */
-    const TemporalConstraintId& getId() const;
 
     /**
      * @brief get the upper and lower bounds of this Tspec
@@ -608,6 +581,9 @@ namespace EUROPA {
      * @param ub returns the upper bound
      */
     inline void getBounds(Time& lb, Time& ub) const {lb = lowerBound; ub = upperBound;}
+
+    inline Time getLowerBound() const {return lowerBound;}
+    inline Time getUpperBound() const {return upperBound;}
 
     /**
      * @brief test if Tspec is complete

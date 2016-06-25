@@ -1,5 +1,5 @@
-#ifndef _H_VariableChangeListener
-#define _H_VariableChangeListener
+#ifndef H_VariableChangeListener
+#define H_VariableChangeListener
 
 /**
  * @file VariableChangeListener.hh
@@ -27,8 +27,8 @@ namespace EUROPA {
      * @param variable The variable to be listened to
      * @param constraintEngine The ConstraintEngine to whcih the listener belongs.
      */
-    VariableChangeListener(const ConstrainedVariableId& variable,
-			   const ConstraintEngineId& constraintEngine);
+    VariableChangeListener(const ConstrainedVariableId variable,
+			   const ConstraintEngineId constraintEngine);
 
     /**
      * @brief Implements handler for a domaing change event. Just a pass through to the ConstraintEngine
@@ -43,7 +43,7 @@ namespace EUROPA {
     ~VariableChangeListener(){} /**< Make this protected so only the ConstrainedVariable can delete it */
 
     const ConstrainedVariableId m_variable; /**< The ConstrainedVariable whose domain we are listening to */
-    const ConstraintEngineId& m_constraintEngine; /**< Cache the ConstraintEngine - candidate subscriber */
+    const ConstraintEngineId m_constraintEngine; /**< Cache the ConstraintEngine - candidate subscriber */
   };
 }
 

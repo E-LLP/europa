@@ -3,6 +3,7 @@
 #include "Filters.hh"
 #include "Solver.hh"
 #include "Context.hh"
+#include "tinyxml.h"
 
 namespace EUROPA
 {
@@ -22,7 +23,7 @@ namespace EUROPA
     return new PSSolverImpl(solver,configurationFile);
   }
 
-  PSSolverImpl::PSSolverImpl(const SOLVERS::SolverId& solver, const std::string& configFilename)
+  PSSolverImpl::PSSolverImpl(const SOLVERS::SolverId solver, const std::string& configFilename)
       : m_solver(solver)
       , m_configFile(configFilename)
   {
@@ -37,9 +38,10 @@ namespace EUROPA
     m_solver->step();
   }
 
-  void PSSolverImpl::solve(int maxSteps, int maxDepth) {
-    m_solver->solve(maxSteps, maxDepth);
-  }
+bool PSSolverImpl::solve(int maxSteps, int maxDepth) {
+  return m_solver->solve(static_cast<unsigned int>(maxSteps),
+                         static_cast<unsigned int>(maxDepth));
+}
 
   bool PSSolverImpl::backjump(unsigned int stepCount) {
 	return m_solver->backjump(stepCount);
@@ -54,16 +56,16 @@ namespace EUROPA
    }
 
   void PSSolverImpl::destroy() {
-    delete (SOLVERS::Solver*) m_solver;
+    delete static_cast<SOLVERS::Solver*>(m_solver);
     m_solver = SOLVERS::SolverId::noId();
   }
 
   int PSSolverImpl::getStepCount() {
-    return (int) m_solver->getStepCount();
+    return static_cast<int>(m_solver->getStepCount());
   }
 
   int PSSolverImpl::getDepth() {
-    return (int) m_solver->getDepth();
+    return static_cast<int>(m_solver->getDepth());
   }
 
   bool PSSolverImpl::isExhausted() {
@@ -89,7 +91,7 @@ namespace EUROPA
       count++;
       flawIt->next();
     }
-    delete (Iterator*) flawIt;
+    delete static_cast<Iterator*>(flawIt);
     return count;
   }
 
@@ -123,17 +125,17 @@ namespace EUROPA
   const std::string& PSSolverImpl::getConfigFilename() {return m_configFile;}
 
   eint::basis_type PSSolverImpl::getHorizonStart() {
-    return m_solver->getContext()->get("horizonStart");
+    return static_cast<eint::basis_type>(m_solver->getContext()->get("horizonStart"));
   }
 
   eint::basis_type PSSolverImpl::getHorizonEnd() {
-    return m_solver->getContext()->get("horizonEnd");
+    return static_cast<eint::basis_type>(m_solver->getContext()->get("horizonEnd"));
   }
 
   void PSSolverImpl::configure(eint::basis_type horizonStart, eint::basis_type horizonEnd) {
     check_runtime_error(horizonStart <= horizonEnd);
-    m_solver->getContext()->put("horizonStart", horizonStart);
-    m_solver->getContext()->put("horizonEnd", horizonEnd);
+    m_solver->getContext()->put("horizonStart", static_cast<double>(horizonStart));
+    m_solver->getContext()->put("horizonEnd", static_cast<double>(horizonEnd));
   }
 
 }

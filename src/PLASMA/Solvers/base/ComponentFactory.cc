@@ -10,39 +10,32 @@
  */
 
 namespace EUROPA {
-  namespace SOLVERS {
+namespace SOLVERS {
 
-    Component::Component()     
-        : m_id(this) 
-    {        
-    }
+Component::Component() : m_id(this), m_name() {}
     
-    Component::Component(const TiXmlElement& configData)
-        : m_id(this) 
-    {        
-    }
+Component::Component(const TiXmlElement&) : m_id(this), m_name() {}
     
-    Component::~Component()
-    {
-        m_id.remove();
-    }
+Component::~Component() {
+  m_id.remove();
+}
 
-    ComponentId& Component::getId() {return m_id;}
+ComponentId Component::getId() {return m_id;}
 
-    const ComponentId& Component::getId() const {return m_id;}
+const ComponentId Component::getId() const {return m_id;}
 
-    const LabelStr& Component::getName() const {
-      return m_name;
-    }
+const std::string& Component::getName() const {
+  return m_name;
+}
 
-    void Component::setName(const LabelStr& name){
-      m_name = name;
-    }
+void Component::setName(const std::string& name){
+  m_name = name;
+}
 
-    ComponentId ComponentFactoryMgr::createInstance(const TiXmlElement& configData)
-    {
-      LabelStr name = extractData(configData, "component");
-      return FactoryMgr::createInstance(name,ComponentArgs(configData));
-    }
-  }
+ComponentId ComponentFactoryMgr::createComponentInstance(const TiXmlElement& configData) {
+  std::string name = extractData(configData, "component");
+  return FactoryMgr::createInstance(name,ComponentArgs(configData));
+}
+
+}
 }

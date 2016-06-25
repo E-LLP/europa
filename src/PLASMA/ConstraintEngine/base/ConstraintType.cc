@@ -9,9 +9,9 @@
 
 namespace EUROPA {
 
-ConstraintType::ConstraintType(const LabelStr& name,
-               const LabelStr& propagatorName,
-               bool systemDefined)
+ConstraintType::ConstraintType(const std::string& name,
+                               const std::string& propagatorName,
+                               bool systemDefined)
     : m_id(this)
     , m_name(name)
     , m_propagatorName(propagatorName)
@@ -21,11 +21,13 @@ ConstraintType::ConstraintType(const LabelStr& name,
 
 ConstraintType::~ConstraintType()
 {
+  if(m_id.isValid())
+    m_id.remove();
 }
 
-const ConstraintTypeId& ConstraintType::getId() const {return m_id;}
+const ConstraintTypeId ConstraintType::getId() const {return m_id;}
 
-const LabelStr& ConstraintType::getName() const { return m_name; }
+const std::string& ConstraintType::getName() const { return m_name; }
 
 bool ConstraintType::isSystemDefined() const { return m_systemDefined;  }
 

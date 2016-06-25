@@ -10,6 +10,9 @@
 #include "Instant.hh"
 #include "Profile.hh"
 
+#define inf PLUS_INFINITY
+
+using namespace EUROPA;
 namespace NDDL {
 
 // -------------------------------------------------------------------------------------------------------
@@ -19,21 +22,21 @@ namespace NDDL {
 static const std::string PARAM_PROFILE_TYPE("profileType");
 static const std::string PARAM_DETECTOR_TYPE("detectorType");
 
-bool isValidCombo(const std::string& profileName, const std::string& detectorName)
-{
-	if(profileName == "GroundedProfile" && detectorName != "GroundedFVDetector")
-		return false;
+namespace {
+bool isValidCombo(const std::string& profileName, const std::string& detectorName) {
+  if(profileName == "GroundedProfile" && detectorName != "GroundedFVDetector")
+    return false;
 
-	return true;
+  return true;
 }
 
 
 // For getting either the profile or detector name specified by the given parameter.  We also check that each is valid, and that the two
 // are valid to use together
-std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, const std::string& defaultProfile, const std::string& defaultDetector)
+std::pair<std::string, std::string> getProfileAndDetectorNames(const Object* res, const std::string& defaultProfile, const std::string& defaultDetector)
 {
-	std::string pFullName = res->getName().toString()+"."+PARAM_PROFILE_TYPE;
-	std::string dFullName = res->getName().toString()+"."+PARAM_DETECTOR_TYPE;
+	std::string pFullName = res->getName()+"."+PARAM_PROFILE_TYPE;
+	std::string dFullName = res->getName()+"."+PARAM_DETECTOR_TYPE;
 
 	ConstrainedVariableId pNameVar = res->getVariable(pFullName);
 	ConstrainedVariableId dNameVar = res->getVariable(dFullName);
@@ -54,19 +57,28 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
 	check_error(isValidCombo(pName.toString(), dName.toString()), "Invalid combination of profile " + pName.toString() + " and detector " + dName.toString());
 	return std::make_pair(pName, dName);
 }
-
+}
 // -------------------------------------------------------------------------------------------------------
 
-  NddlUnaryToken::NddlUnaryToken(const PlanDatabaseId& planDatabase, const LabelStr& predicateName, const bool& rejectable, const bool& isFact, const bool& close)
-    : EUROPA::UnaryToken(planDatabase, predicateName, rejectable, isFact, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-			       EUROPA::Token::noObject(), false, false) {
-    commonInit(close);
-  }
+NddlUnaryToken::NddlUnaryToken(const PlanDatabaseId planDatabase, 
+                               const std::string& predicateName, 
+                               const bool& rejectable, const bool& _isFact,
+                               const bool& _close)
+    : EUROPA::UnaryToken(planDatabase, predicateName, rejectable, _isFact,
+                         IntervalIntDomain(), IntervalIntDomain(), 
+                         IntervalIntDomain(1, PLUS_INFINITY),
+                         EUROPA::Token::noObject(), false, false), 
+  state(), object(), tStart(), tEnd(), tDuration() {
+  commonInit(_close);
+}
 
-  NddlUnaryToken::NddlUnaryToken(const TokenId& master, const LabelStr& predicateName, const LabelStr& relation, const bool& close)
-    : EUROPA::UnaryToken(master, relation, predicateName, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-			       EUROPA::Token::noObject(), false, false) {
-    commonInit(close);
+NddlUnaryToken::NddlUnaryToken(const TokenId _master, const std::string& predicateName, 
+                               const std::string& relation, const bool& _close)
+    : EUROPA::UnaryToken(_master, relation, predicateName, IntervalIntDomain(),
+                         IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
+                         EUROPA::Token::noObject(), false, false),
+      state(), object(), tStart(), tEnd(), tDuration() {
+    commonInit(_close);
   }
 
   void NddlUnaryToken::handleDefaults(const bool&) {}
@@ -81,17 +93,17 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
       close();
   }
 
-  NddlUnary::NddlUnary(const PlanDatabaseId& planDatabase,
-			     const LabelStr& type,
-			     const LabelStr& name,
-			     bool open)
-    : EUROPA::Reusable(planDatabase, type, name, open) {}
+NddlUnary::NddlUnary(const PlanDatabaseId planDatabase,
+                     const std::string& type,
+                     const std::string& name,
+                     bool open)
+    : EUROPA::Reusable(planDatabase, type, name, open), consumptionMax() {}
 
-  NddlUnary::NddlUnary(const ObjectId& parent,
-			     const LabelStr& type,
-			     const LabelStr& name,
-			     bool open)
-    : EUROPA::Reusable(parent, type, name, open) {}
+NddlUnary::NddlUnary(const ObjectId parent,
+                     const std::string& type,
+                     const std::string& name,
+                     bool open)
+    : EUROPA::Reusable(parent, type, name, open), consumptionMax() {}
 
 
   void NddlUnary::close() {
@@ -100,11 +112,11 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     static const std::string PARAM_CONSUMPTION_MAX("consumptionMax");
 
     check_error(m_variables.size() >= ARG_COUNT);
-    check_error(m_variables[CMAX]->getName().toString().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
+    check_error(m_variables[CMAX]->getName().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
 
     check_error(m_variables[CMAX]->derivedDomain().isSingleton());
 
-    std::pair <LabelStr, LabelStr> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
+    std::pair <std::string, std::string> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
 
     init(1, 1, //capacity lb, capacity ub
          0, 1,//lower limit, upper limit
@@ -130,28 +142,32 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     consumptionMax = addVariable(IntervalDomain(PLUS_INFINITY, PLUS_INFINITY, FloatDT::instance()), "consumptionMax");
   }
 
-  NddlUnary::use::use(const PlanDatabaseId& planDatabase,
-                      const LabelStr& predicateName,
-                      bool rejectable,
-                      bool isFact,
-                      bool close)
-    : EUROPA::ReusableToken(planDatabase, predicateName, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-                                  IntervalDomain(1.0), Token::noObject(), false) {
-    handleDefaults(close);
-  }
+NddlUnary::use::use(const PlanDatabaseId planDatabase,
+                    const std::string& predicateName,
+                    bool ,
+                    bool ,
+                    bool _close)
+    : EUROPA::ReusableToken(planDatabase, predicateName, IntervalIntDomain(), 
+                            IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
+                            IntervalDomain(1.0), Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration() {
+  handleDefaults(_close);
+}
 
-  NddlUnary::use::use(const TokenId& master,
-				const LabelStr& predicateName,
-				const LabelStr& relation,
-				bool close)
-    : EUROPA::ReusableToken(master, relation, predicateName, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-                                  IntervalDomain(1.0), Token::noObject(), false) {
-    handleDefaults(close);
-  }
+NddlUnary::use::use(const TokenId _master,
+                    const std::string& predicateName,
+                    const std::string& relation,
+                    bool _close)
+    : EUROPA::ReusableToken(_master, relation, predicateName, IntervalIntDomain(),
+                            IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
+                            IntervalDomain(1.0), Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration() {
+  handleDefaults(_close);
+}
 
-  void NddlUnary::use::close() {
-    EUROPA::ReusableToken::close();
-  }
+void NddlUnary::use::close() {
+  EUROPA::ReusableToken::close();
+}
 
   void NddlUnary::use::handleDefaults(bool autoClose) {
     state = getState();
@@ -166,17 +182,19 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
 
   /*===============*/
 
-  NddlReusable::NddlReusable(const PlanDatabaseId& planDatabase,
-			     const LabelStr& type,
-			     const LabelStr& name,
-			     bool open)
-    : EUROPA::Reusable(planDatabase, type, name, open) {}
+NddlReusable::NddlReusable(const PlanDatabaseId planDatabase,
+                           const std::string& type,
+                           const std::string& name,
+                           bool open)
+    : EUROPA::Reusable(planDatabase, type, name, open),
+      capacity(), levelLimitMin(), consumptionRateMax(), consumptionMax() {}
 
-  NddlReusable::NddlReusable(const ObjectId& parent,
-			     const LabelStr& type,
-			     const LabelStr& name,
-			     bool open)
-    : EUROPA::Reusable(parent, type, name, open) {}
+NddlReusable::NddlReusable(const ObjectId parent,
+                           const std::string& type,
+                           const std::string& name,
+                           bool open)
+    : EUROPA::Reusable(parent, type, name, open),
+      capacity(), levelLimitMin(), consumptionRateMax(), consumptionMax() {}
 
   void NddlReusable::close() {
     static const unsigned int C = 0;
@@ -190,17 +208,17 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     static const std::string PARAM_CONSUMPTION_MAX("consumptionMax");
 
     check_error(m_variables.size() >= ARG_COUNT);
-    check_error(m_variables[C]->getName().toString().find(PARAM_CAPACITY) != std::string::npos);
-    check_error(m_variables[LLMIN]->getName().toString().find(PARAM_LEVEL_LIMIT_MIN) != std::string::npos);
-    check_error(m_variables[CRMAX]->getName().toString().find(PARAM_CONSUMPTION_RATE_MAX) != std::string::npos);
-    check_error(m_variables[CMAX]->getName().toString().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
+    check_error(m_variables[C]->getName().find(PARAM_CAPACITY) != std::string::npos);
+    check_error(m_variables[LLMIN]->getName().find(PARAM_LEVEL_LIMIT_MIN) != std::string::npos);
+    check_error(m_variables[CRMAX]->getName().find(PARAM_CONSUMPTION_RATE_MAX) != std::string::npos);
+    check_error(m_variables[CMAX]->getName().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
 
     check_error(m_variables[C]->derivedDomain().isSingleton());
     check_error(m_variables[LLMIN]->derivedDomain().isSingleton());
     check_error(m_variables[CRMAX]->derivedDomain().isSingleton());
     check_error(m_variables[CMAX]->derivedDomain().isSingleton());
 
-    std::pair <LabelStr, LabelStr> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
+    std::pair <std::string, std::string> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
 
     // Since there is no production, upper level flaws will never occur in a Reusable.
     // We set the Upper Limit to PLUS_INIFINITY to indicate that.
@@ -259,23 +277,27 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     consumptionMax = addVariable(IntervalDomain(PLUS_INFINITY, PLUS_INFINITY, FloatDT::instance()), "consumptionMax");
   }
 
-  NddlReusable::uses::uses(const PlanDatabaseId& planDatabase,
-				const LabelStr& predicateName,
-				bool rejectable,
-				bool isFact,
-				bool close)
-    : EUROPA::ReusableToken(planDatabase, predicateName, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-				  Token::noObject(), false) {
-    handleDefaults(close);
+NddlReusable::uses::uses(const PlanDatabaseId planDatabase,
+                         const std::string& predicateName,
+                         bool ,
+                         bool ,
+                         bool _close)
+    : EUROPA::ReusableToken(planDatabase, predicateName, IntervalIntDomain(), 
+                            IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
+                            Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), quantity() {
+    handleDefaults(_close);
   }
 
-  NddlReusable::uses::uses(const TokenId& master,
-				const LabelStr& predicateName,
-				const LabelStr& relation,
-				bool close)
-    : EUROPA::ReusableToken(master, relation, predicateName, IntervalIntDomain(), IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
-				  Token::noObject(), false) {
-    handleDefaults(close);
+NddlReusable::uses::uses(const TokenId _master,
+                         const std::string& predicateName,
+                         const std::string& relation,
+                         bool _close)
+    : EUROPA::ReusableToken(_master, relation, predicateName, IntervalIntDomain(), 
+                            IntervalIntDomain(), IntervalIntDomain(1, PLUS_INFINITY),
+                            Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), quantity() {
+    handleDefaults(_close);
   }
 
   void NddlReusable::uses::close() {
@@ -296,17 +318,19 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
 
   /*===============*/
 
-  NddlCBReusable::NddlCBReusable(const PlanDatabaseId& planDatabase,
-                 const LabelStr& type,
-                 const LabelStr& name,
-                 bool open)
-    : EUROPA::CBReusable(planDatabase, type, name, open) {}
+NddlCBReusable::NddlCBReusable(const PlanDatabaseId planDatabase,
+                               const std::string& type,
+                               const std::string& name,
+                               bool open)
+    : EUROPA::CBReusable(planDatabase, type, name, open), 
+      capacity(), levelLimitMin(), consumptionRateMax(), consumptionMax() {}
 
-  NddlCBReusable::NddlCBReusable(const ObjectId& parent,
-                 const LabelStr& type,
-                 const LabelStr& name,
-                 bool open)
-    : EUROPA::CBReusable(parent, type, name, open) {}
+NddlCBReusable::NddlCBReusable(const ObjectId parent,
+                               const std::string& type,
+                               const std::string& name,
+                               bool open)
+    : EUROPA::CBReusable(parent, type, name, open),
+      capacity(), levelLimitMin(), consumptionRateMax(), consumptionMax(){}
 
   void NddlCBReusable::close() {
     static const unsigned int C = 0;
@@ -320,17 +344,17 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     static const std::string PARAM_CONSUMPTION_MAX("consumptionMax");
 
     check_error(m_variables.size() >= ARG_COUNT);
-    check_error(m_variables[C]->getName().toString().find(PARAM_CAPACITY) != std::string::npos);
-    check_error(m_variables[LLMIN]->getName().toString().find(PARAM_LEVEL_LIMIT_MIN) != std::string::npos);
-    check_error(m_variables[CRMAX]->getName().toString().find(PARAM_CONSUMPTION_RATE_MAX) != std::string::npos);
-    check_error(m_variables[CMAX]->getName().toString().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
+    check_error(m_variables[C]->getName().find(PARAM_CAPACITY) != std::string::npos);
+    check_error(m_variables[LLMIN]->getName().find(PARAM_LEVEL_LIMIT_MIN) != std::string::npos);
+    check_error(m_variables[CRMAX]->getName().find(PARAM_CONSUMPTION_RATE_MAX) != std::string::npos);
+    check_error(m_variables[CMAX]->getName().find(PARAM_CONSUMPTION_MAX) != std::string::npos);
 
     check_error(m_variables[C]->derivedDomain().isSingleton());
     check_error(m_variables[LLMIN]->derivedDomain().isSingleton());
     check_error(m_variables[CRMAX]->derivedDomain().isSingleton());
     check_error(m_variables[CMAX]->derivedDomain().isSingleton());
 
-    std::pair <LabelStr, LabelStr> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
+    std::pair <std::string, std::string> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
 
     // Since there is no production, upper level flaws will never occur in a Reusable.
     // We set the Upper Limit to PLUS_INIFINITY to indicate that.
@@ -396,17 +420,23 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
 
   /*===============*/
 
-  NddlReservoir::NddlReservoir(const PlanDatabaseId& planDatabase,
-			       const LabelStr& type,
-			       const LabelStr& name,
-			       bool open)
-    : EUROPA::Reservoir(planDatabase, type, name, open) {}
+NddlReservoir::NddlReservoir(const PlanDatabaseId planDatabase,
+                             const std::string& type,
+                             const std::string& name,
+                             bool open)
+    : EUROPA::Reservoir(planDatabase, type, name, open),
+      initialCapacity(), levelLimitMin(), levelLimitMax(),
+      productionRateMax(), productionMax(), consumptionRateMax(), consumptionMax()
+ {}
 
-  NddlReservoir::NddlReservoir(const ObjectId parent,
-			       const LabelStr& type,
-			       const LabelStr& name,
-			       bool open)
-    : EUROPA::Reservoir(parent, type, name, open) {}
+NddlReservoir::NddlReservoir(const ObjectId parent,
+                             const std::string& type,
+                             const std::string& name,
+                             bool open)
+    : EUROPA::Reservoir(parent, type, name, open),
+      initialCapacity(), levelLimitMin(), levelLimitMax(),
+      productionRateMax(), productionMax(), consumptionRateMax(), consumptionMax()
+{}
 
   void NddlReservoir::close() {
     static const int IC = 0;
@@ -428,13 +458,13 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     // Ensure the binding of variable names is as expected
 
     check_error(m_variables.size() >= ARG_COUNT);
-    check_error(m_variables[IC]->getName().toString().find(PARAM_INITIAL_CAPACITY)  != std::string::npos);
-    check_error(m_variables[LLMIN]->getName().toString().find(PARAM_LEVEL_LIMIT_MIN)  != std::string::npos);
-    check_error(m_variables[LLMAX]->getName().toString().find(PARAM_LEVEL_LIMIT_MAX)  != std::string::npos);
-    check_error(m_variables[PRMAX]->getName().toString().find(PARAM_PRODUCTION_RATE_MAX)  != std::string::npos);
-    check_error(m_variables[PMAX]->getName().toString().find(PARAM_PRODUCTION_MAX)  != std::string::npos);
-    check_error(m_variables[CRMAX]->getName().toString().find(PARAM_CONSUMPTION_RATE_MAX)  != std::string::npos);
-    check_error(m_variables[CMAX]->getName().toString().find(PARAM_CONSUMPTION_MAX)  != std::string::npos);
+    check_error(m_variables[IC]->getName().find(PARAM_INITIAL_CAPACITY)  != std::string::npos);
+    check_error(m_variables[LLMIN]->getName().find(PARAM_LEVEL_LIMIT_MIN)  != std::string::npos);
+    check_error(m_variables[LLMAX]->getName().find(PARAM_LEVEL_LIMIT_MAX)  != std::string::npos);
+    check_error(m_variables[PRMAX]->getName().find(PARAM_PRODUCTION_RATE_MAX)  != std::string::npos);
+    check_error(m_variables[PMAX]->getName().find(PARAM_PRODUCTION_MAX)  != std::string::npos);
+    check_error(m_variables[CRMAX]->getName().find(PARAM_CONSUMPTION_RATE_MAX)  != std::string::npos);
+    check_error(m_variables[CMAX]->getName().find(PARAM_CONSUMPTION_MAX)  != std::string::npos);
 
 
     // Ensure all values have been set to singletons already
@@ -446,7 +476,7 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
     check_error(m_variables[CRMAX]->derivedDomain().isSingleton());
     check_error(m_variables[CMAX]->derivedDomain().isSingleton());
 
-    std::pair <LabelStr, LabelStr> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
+    std::pair <std::string, std::string> pd = getProfileAndDetectorNames(this, "IncrementalFlowProfile", "ClosedWorldFVDetector");
 
     init(m_variables[IC]->derivedDomain().getSingletonValue(), m_variables[IC]->derivedDomain().getSingletonValue(),
 	 m_variables[LLMIN]->derivedDomain().getSingletonValue(), m_variables[LLMAX]->derivedDomain().getSingletonValue(),
@@ -524,22 +554,26 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
   }
 
 
-  NddlReservoir::produce::produce(const PlanDatabaseId& planDatabase,
-				    const LabelStr& predicateName,
-				    bool rejectable,
-				    bool isFact,
-				    bool close)
-    : EUROPA::ProducerToken(planDatabase, predicateName, rejectable, isFact, IntervalIntDomain(), Token::noObject(), false) {
-    handleDefaults(close);
-  }
+NddlReservoir::produce::produce(const PlanDatabaseId planDatabase,
+                                const std::string& predicateName,
+                                bool rejectable,
+                                bool _isFact,
+                                bool _close)
+    : EUROPA::ProducerToken(planDatabase, predicateName, rejectable, _isFact,
+                            IntervalIntDomain(), Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), time(), quantity() {
+  handleDefaults(_close);
+}
 
-  NddlReservoir::produce::produce(const TokenId& master,
-			       const LabelStr& predicateName,
-			       const LabelStr& relation,
-			       bool close)
-    : EUROPA::ProducerToken(master, relation, predicateName, IntervalIntDomain(), Token::noObject(), false) {
-    handleDefaults(close);
-  }
+NddlReservoir::produce::produce(const TokenId _master,
+                                const std::string& predicateName,
+                                const std::string& relation,
+                                bool _close)
+    : EUROPA::ProducerToken(_master, relation, predicateName, IntervalIntDomain(), 
+                            Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), time(), quantity()  {
+  handleDefaults(_close);
+}
 
   void NddlReservoir::produce::close() {
     EUROPA::ProducerToken::close();
@@ -558,22 +592,26 @@ std::pair <LabelStr, LabelStr> getProfileAndDetectorNames(const Object* res, con
       close();
   }
 
-  NddlReservoir::consume::consume(const PlanDatabaseId& planDatabase,
-				    const LabelStr& predicateName,
-				    bool rejectable,
-				    bool isFact,
-				    bool close)
-    : EUROPA::ConsumerToken(planDatabase, predicateName, rejectable, isFact, IntervalIntDomain(), Token::noObject(), false) {
-    handleDefaults(close);
+NddlReservoir::consume::consume(const PlanDatabaseId planDatabase,
+                                const std::string& predicateName,
+                                bool rejectable,
+                                bool _isFact,
+                                bool _close)
+    : EUROPA::ConsumerToken(planDatabase, predicateName, rejectable, _isFact,
+                            IntervalIntDomain(), Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), time(), quantity() {
+    handleDefaults(_close);
   }
 
-  NddlReservoir::consume::consume(const TokenId& master,
-			       const LabelStr& predicateName,
-			       const LabelStr& relation,
-			       bool close)
-    : EUROPA::ConsumerToken(master, relation, predicateName, IntervalIntDomain(), Token::noObject(), false) {
-    handleDefaults(close);
-  }
+NddlReservoir::consume::consume(const TokenId _master,
+			       const std::string& predicateName,
+			       const std::string& relation,
+			       bool _close)
+    : EUROPA::ConsumerToken(_master, relation, predicateName, IntervalIntDomain(),
+                            Token::noObject(), false),
+      state(), object(), tStart(), tEnd(), tDuration(), time(), quantity() {
+  handleDefaults(_close);
+}
 
   void NddlReservoir::consume::close() {
     EUROPA::ConsumerToken::close();

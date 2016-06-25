@@ -11,9 +11,11 @@ namespace EUROPA {
       m_sm.release();
   }
   
-  UnifyMemento::UnifyMemento() {}
+UnifyMemento::UnifyMemento() : m_method(mergeMethod), m_mm(), m_sm() {}
 
-  UnifyMemento::UnifyMemento(const TokenId& inactiveToken, const TokenId& activeToken) {
+UnifyMemento::UnifyMemento(const TokenId inactiveToken,
+                           const TokenId activeToken) : m_method(mergeMethod), m_mm(),
+                                                        m_sm() {
     static const char* TRUE_VALUE = "1";
 
     const char *envStr = getenv("EUROPA_USE_STACK_METHOD");
@@ -43,7 +45,7 @@ namespace EUROPA {
       m_mm->undo(activeTokenDeleted);
   }
 
-  void UnifyMemento::handleAdditionOfInactiveConstraint(const ConstraintId& constraint) {
+  void UnifyMemento::handleAdditionOfInactiveConstraint(const ConstraintId constraint) {
     check_error(m_mm.isNoId() || m_sm.isNoId());
     check_error(!m_mm.isNoId() || !m_sm.isNoId());
     if (m_mm.isNoId())
@@ -52,7 +54,7 @@ namespace EUROPA {
       m_mm->handleAdditionOfInactiveConstraint(constraint);
   }
 
-  void UnifyMemento::handleRemovalOfInactiveConstraint(const ConstraintId& constraint) {
+  void UnifyMemento::handleRemovalOfInactiveConstraint(const ConstraintId constraint) {
     check_error(m_mm.isNoId() || m_sm.isNoId());
     check_error(!m_mm.isNoId() || !m_sm.isNoId());
     if (m_mm.isNoId())

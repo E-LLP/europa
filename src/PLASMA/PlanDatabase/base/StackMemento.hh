@@ -1,10 +1,9 @@
-#ifndef _H_StackMemento
-#define _H_StackMemento
+#ifndef H_StackMemento
+#define H_StackMemento
 
 #include "PlanDatabaseDefs.hh"
 #include "Token.hh"
 //#include "TokenVariable.hh"
-#include "LabelStr.hh"
 #include "Constraint.hh"
 #include "ConstrainedVariable.hh"
 #include <list>
@@ -16,11 +15,11 @@ namespace EUROPA {
     virtual ~StackMemento();
   private:
     friend class UnifyMemento;
-    StackMemento(const TokenId& activeTokenToStack, const TokenId& activeToken);
+    StackMemento(const TokenId activeTokenToStack, const TokenId activeToken);
     void undo(bool activeTokenDeleted);
 
-    void handleAdditionOfInactiveConstraint(const ConstraintId& constraint);
-    void handleRemovalOfInactiveConstraint(const ConstraintId& constraint);
+    void handleAdditionOfInactiveConstraint(const ConstraintId constraint);
+    void handleRemovalOfInactiveConstraint(const ConstraintId constraint);
     const TokenId m_activeTokenToStack;
     const TokenId m_activeToken;
     std::list<ConstraintId> m_stackConstraints;

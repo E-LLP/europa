@@ -1,5 +1,5 @@
-#ifndef _H_PSEngineImpl
-#define _H_PSEngineImpl
+#ifndef H_PSEngineImpl
+#define H_PSEngineImpl
 
 #include "PSEngine.hh"
 #include "EuropaEngine.hh"
@@ -18,7 +18,9 @@ namespace EUROPA {
     virtual EngineConfig* getConfig();
 
     virtual void addModule(Module* module);
+    virtual void addModule(ModuleId module) {addModule(static_cast<Module*>(module));}
     virtual void removeModule(Module* module);
+    virtual void removeModule(ModuleId module) {removeModule(static_cast<Module*>(module));}
     virtual void loadModule(const std::string& moduleFileName);
 
     virtual std::string executeScript(const std::string& language, const std::string& script, bool isFile);
@@ -66,4 +68,4 @@ namespace EUROPA {
 
 }
 
-#endif // _H_PSEngineImpl
+#endif // H_PSEngineImpl

@@ -1,9 +1,10 @@
 
+#include "Error.hh"
 #include "Engine.hh"
 #include "Debug.hh"
-#include "LabelStr.hh"
 #include "Entity.hh"
 #include "Module.hh"
+#include "tinyxml.h"
 #ifdef _MSC_VER
 #include "Pdlfcn.hh"
 #else
@@ -18,19 +19,17 @@
 
 namespace EUROPA
 {
-    void EngineComponent::setEngine(EngineId& engine)
+    void EngineComponent::setEngine(EngineId engine)
     {
         m_engine = engine;
     }
 
-    EngineId& EngineComponent::getEngine()
+    EngineId EngineComponent::getEngine()
     {
         return m_engine;
     }
 
-    EngineConfig::EngineConfig()
-    {
-    }
+  EngineConfig::EngineConfig() : m_properties() {}
 
     EngineConfig::~EngineConfig()
     {
@@ -52,80 +51,85 @@ namespace EUROPA
         m_properties[name] = value;
     }
 
-	int EngineConfig::readFromXML(const char* file_name, bool isFile){
+int EngineConfig::readFromXML(const char* file_name, bool isFile) {
+  check_runtime_error(file_name != NULL);
+  bool loadStat = false;
+  int status = 0;
+  TiXmlElement * xml = 0;
+  TiXmlDocument * m_doc = 0;
+  if(isFile)
+  {
+    m_doc = new TiXmlDocument(file_name);
+    loadStat = m_doc->LoadFile();
+    checkError(!m_doc->Error(), "Invalid or malformed XML file '" << file_name << "' " << m_doc->ErrorDesc());
+  }
+  else
+  {
+    m_doc = new TiXmlDocument();
+    m_doc->Parse(file_name);
+    if(!m_doc->NoChildren())
+      loadStat = true;
+  }
 
-		bool loadStat = false;
-		int status = 0;
-		TiXmlElement * xml = 0;
-		TiXmlDocument * m_doc = 0;
-		if(isFile)
-		{
-			m_doc = new TiXmlDocument(file_name);
-			loadStat = m_doc->LoadFile();
-			checkError(!m_doc->Error(), "Invalid or malformed XML file '" << file_name << "' " << m_doc->ErrorDesc());
-		}
-		else
-		{
-			m_doc = new TiXmlDocument();
-			m_doc->Parse(file_name);
-			if(!m_doc->NoChildren())
-				loadStat = true;
-		}
+  if(loadStat)
+  {
+    xml = m_doc->RootElement();
+    if (xml == NULL) return 0;
+    if(strcmp(static_cast<const char *>(xml->Value()),"EuropaConfig") == 0)
+    {
+      parseXML(xml);
+      status = 1;
+    }
+    else
+      debugMsg("EngineConfig",
+               "Expected <EuropaConfig>, Found: " <<
+               static_cast<const char *>(xml->Value()));
+  }
+  else
+  {
+    assertTrue(ALWAYS_FAIL, "LOAD FAIL");
+  }
+  delete m_doc;
+  return status;
 
-		if(loadStat)
-		{
-			xml = m_doc->RootElement();
-			if (xml == NULL) return 0;
-			if(strcmp((const char *)xml->Value(),"EuropaConfig") == 0)
-			{
-				parseXML(xml);
-				status = 1;
-			}
-			else
-				debugMsg("EngineConfig","Expected <EuropaConfig>, Found: " << (const char *)xml->Value());
-		}
-		else
-		{
-			assert("LOAD FAIL");
-		}
-		delete m_doc;
-		return status;
+}
 
-	}
-
-	void EngineConfig::parseXML(TiXmlNode * pParent){
-		TiXmlNode * pChild = 0;
-		TiXmlNode * pChildEle = 0;
-		const char * comp_name = "";
-		const char * prop_name = "";
-		const char * prop_value = "";
-		while(( pChild = pParent->IterateChildren( pChild ) ))
-		{
-			if( pParent->Type() == TiXmlNode::ELEMENT )
-			{
-				if(strcmp((const char *)pChild->ToElement()->Value(),"Component") == 0
-										&& pChild->ToElement())
-				{
-					comp_name = (const char *)pChild->ToElement()->FirstAttribute()->Value();
-				}
-
-				while((pChildEle = pChild->IterateChildren(pChildEle))
-						&& strcmp((const char *)pChild->ToElement()->FirstChildElement()->Value(),"Property") == 0)
-				{
-					if(pChildEle->FirstChild())
-					{
-						prop_name = (const char *)pChildEle->ToElement()->FirstAttribute()->Value();
-						prop_value = (const char *)pChildEle->FirstChild()->ToText()->Value();
-						if(std::string(prop_name).compare("") != 0)
-						{
-							setProperty(std::string(comp_name).append(".").append(prop_name), std::string(prop_value));
-						}
-					}
-				}
-			}
-
-		}
-	}
+void EngineConfig::parseXML(TiXmlNode * pParent){
+  TiXmlNode * pChild = 0;
+  TiXmlNode * pChildEle = 0;
+  const char * comp_name = "";
+  const char * prop_name = "";
+  const char * prop_value = "";
+  while(( pChild = pParent->IterateChildren( pChild ) ))
+  {
+    if( pParent->Type() == TiXmlNode::ELEMENT )
+    {
+      if(strcmp(static_cast<const char *>(pChild->ToElement()->Value()),"Component") == 0
+         && pChild->ToElement())
+      {
+        comp_name =
+            static_cast<const char *>(pChild->ToElement()->FirstAttribute()->Value());
+      }
+      
+      while((pChildEle = pChild->IterateChildren(pChildEle))
+            && strcmp(static_cast<const char *>(pChild->ToElement()->FirstChildElement()->Value()),
+                      "Property") == 0)
+      {
+        if(pChildEle->FirstChild())
+        {
+          prop_name =
+              static_cast<const char *>(pChildEle->ToElement()->FirstAttribute()->Value());
+          prop_value = static_cast<const char *>(pChildEle->FirstChild()->ToText()->Value());
+          if(std::string(prop_name).compare("") != 0)
+          {
+            setProperty(std::string(comp_name).append(".").append(prop_name), std::string(prop_value));
+          }
+        }
+      }
+    }
+    
+  }
+}
 
 	void EngineConfig::writeFromXML(const char* file_name){
 		TiXmlDocument * m_doc = new TiXmlDocument(file_name);
@@ -177,9 +181,8 @@ namespace EUROPA
 		return;
 	}
 
-    EngineBase::EngineBase()
-    {
-    	m_started = false;
+  EngineBase::EngineBase() : m_config(NULL), m_modules(), m_languageInterpreters(),
+			     m_components(), m_started(false) {
     	// TODO: make this data-driven so XML/database configs can be instanciated.
     	m_config = new EngineConfig();
     }
@@ -194,14 +197,14 @@ namespace EUROPA
     {
         std::vector<ModuleId>::iterator it;
         for (it = m_modules.begin(); it != m_modules.end(); ++it) {
-            ModuleId& m = *it;
+            ModuleId m = *it;
             m.release();
         }
         m_modules.clear();
     }
 
 
-    ModuleId& EngineBase::getModule(const std::string& name)
+    ModuleId EngineBase::getModule(const std::string& name)
     {
         static ModuleId noId=ModuleId::noId();
 
@@ -231,11 +234,10 @@ namespace EUROPA
 	    	initializeModule(m_modules[i]);
     }
 
-    void EngineBase::uninitializeModules()
-    {
-        for (unsigned int i=m_modules.size(); i>0 ;i--)
-        	uninitializeModule(m_modules[i-1]);
-    }
+void EngineBase::uninitializeModules() {
+  for (std::vector<ModuleId>::size_type i=m_modules.size(); i>0 ;i--)
+    uninitializeModule(m_modules[i-1]);
+}
 
     bool EngineBase::isStarted()
     {
@@ -288,36 +290,45 @@ namespace EUROPA
 		m_modules.erase(it);
 	}
 
+template <typename T>
+struct fptr_cast_helper {
+  union helper {
+    void* v;
+    T fn;
+  };
+  helper h;
+};
 	// Basically a copy of PSEngineImpl::loadModel
-	void EngineBase::loadModule(const std::string& moduleFileName)
-	{
-		check_runtime_error(m_started,"Engine has not been started");
+void EngineBase::loadModule(const std::string& moduleFileName) {
+  check_runtime_error(m_started,"Engine has not been started");
 
-	#ifdef _MSC_VER
-		void* libHandle = p_dlopen(moduleFileName.c_str(), RTLD_NOW);
-		checkRuntimeError(libHandle != NULL,
-				"Error opening module " << moduleFileName << ": " << p_dlerror());
+#ifdef _MSC_VER
+  void* libHandle = p_dlopen(moduleFileName.c_str(), RTLD_NOW);
+  checkRuntimeError(libHandle != NULL,
+                    "Error opening module " << moduleFileName << ": " << p_dlerror());
 
-		Module* (*fcn_module)();
-		fcn_module = (Module* (*)()) p_dlsym(libHandle, "initializeModule");
-		checkError(fcn_module != NULL,
-				"Error locating symbol 'initializeModule' in " << moduleFileName << ": " <<
-				p_dlerror());
-	#else
-		void* libHandle = dlopen(moduleFileName.c_str(), RTLD_NOW);
-		checkRuntimeError(libHandle != NULL,
-				"Error opening module " << moduleFileName << ": " << dlerror());
+  Module* (*fcn_module)();
+  fcn_module = (Module* (*)()) p_dlsym(libHandle, "initializeModule");
+  checkError(fcn_module != NULL,
+             "Error locating symbol 'initializeModule' in " << moduleFileName << ": " <<
+             p_dlerror());
+#else
+  void* libHandle = dlopen(moduleFileName.c_str(), RTLD_NOW);
+  checkRuntimeError(libHandle != NULL,
+                    "Error opening module " << moduleFileName << ": " << dlerror());
 
-		Module* (*fcn_module)();
-		fcn_module = (Module* (*)()) dlsym(libHandle, "initializeModule");
-		checkError(fcn_module != NULL,
-				"Error locating symbol 'initializeModule' in " << moduleFileName << ": " <<
-				dlerror());
-	#endif
+  Module* (*fcn_module)();
+  fptr_cast_helper<Module*(*)()> helper;
+  helper.h.v = dlsym(libHandle, "initializeModule");
+  fcn_module = helper.h.fn;
+  checkError(fcn_module != NULL,
+             "Error locating symbol 'initializeModule' in " << moduleFileName << ": " <<
+             dlerror());
+#endif
 
-		ModuleId module = (*fcn_module)()->getId();
-		addModule(module);
-	}
+  ModuleId module = (*fcn_module)()->getId();
+  addModule(module);
+}
 
 
     void EngineBase::initializeByModule(ModuleId module)
@@ -338,128 +349,123 @@ namespace EUROPA
 	    	initializeByModule(m_modules[i]);
     }
 
-    void EngineBase::uninitializeByModules()
-    {
-    	for (int i=m_modules.size(); i>0; i--)
-    		uninitializeByModule(m_modules[i-1]);
-    }
+void EngineBase::uninitializeByModules() {
+  for (std::vector<ModuleId>::size_type i=m_modules.size(); i>0; i--)
+    uninitializeByModule(m_modules[i-1]);
+}
 
-    std::string EngineBase::executeScript(const std::string& language, const std::string& script, bool isFile)
-    {
-      std::map<edouble, LanguageInterpreter*>::iterator it = getLanguageInterpreters().find(LabelStr(language));
-      checkRuntimeError(it != getLanguageInterpreters().end(),
-  		      "Cannot execute script for unknown language \"" << language << "\"");
+std::string EngineBase::executeScript(const std::string& language,
+                                      const std::string& script, bool isFile) {
+  std::map<std::string, LanguageInterpreter*>::iterator it =
+      getLanguageInterpreters().find(language);
+  checkRuntimeError(it != getLanguageInterpreters().end(),
+                    "Cannot execute script for unknown language \"" << language << "\"");
 
-      std::istream *in;
-      std::string source;
-      if (isFile) {
-        in = new std::ifstream(script.c_str());
-        checkRuntimeError(in->good(), "Cannot read script from location \"" << script << "\"");
-        source = script;
-      }
-      else {
-        in = new std::istringstream(script);
-        source = "<eval>";
-      }
+  std::istream *in;
+  std::string source;
+  if (isFile) {
+    in = new std::ifstream(script.c_str());
+    checkRuntimeError(in->good(), "Cannot read script from location \"" << script << "\"");
+    source = script;
+  }
+  else {
+    in = new std::istringstream(script);
+    source = "<eval>";
+  }
 
-      std::string retval = it->second->interpret(*in, source);
-      delete in;
+  std::string retval = it->second->interpret(*in, source);
+  delete in;
 
-      return retval;
-    }
+  return retval;
+}
 
-    LanguageInterpreter *EngineBase::addLanguageInterpreter(const std::string& language, LanguageInterpreter* interpreter)
-    {
-      LanguageInterpreter *old = NULL;
-      std::map<edouble, LanguageInterpreter*>::iterator it = getLanguageInterpreters().find(LabelStr(language));
-      if(it == getLanguageInterpreters().end())
-        getLanguageInterpreters().insert(std::make_pair(LabelStr(language), interpreter));
-      else {
-    	old = it->second;
-        it->second = interpreter;
-      }
-      interpreter->setEngine(getId());
-      return old;
-    }
+LanguageInterpreter *EngineBase::addLanguageInterpreter(const std::string& language,
+                                                        LanguageInterpreter* interpreter) {
+  LanguageInterpreter *old = NULL;
+  std::map<std::string, LanguageInterpreter*>::iterator it =
+      getLanguageInterpreters().find(language);
+  if(it == getLanguageInterpreters().end())
+    getLanguageInterpreters().insert(std::make_pair(language, interpreter));
+  else {
+    old = it->second;
+    it->second = interpreter;
+  }
+  interpreter->setEngine(getId());
+  return old;
+}
 
-    LanguageInterpreter* EngineBase::removeLanguageInterpreter(const std::string& language)
-    {
-      LanguageInterpreter *old = NULL;
-      std::map<edouble, LanguageInterpreter*>::iterator it = getLanguageInterpreters().find(LabelStr(language));
-      if(it != getLanguageInterpreters().end()) {
-    	old = it->second;
-        getLanguageInterpreters().erase(it);
-      }
-      return old;
-    }
+LanguageInterpreter* EngineBase::removeLanguageInterpreter(const std::string& language) {
+  LanguageInterpreter *old = NULL;
+  std::map<std::string, LanguageInterpreter*>::iterator it =
+      getLanguageInterpreters().find(language);
+  if(it != getLanguageInterpreters().end()) {
+    old = it->second;
+    getLanguageInterpreters().erase(it);
+  }
+  return old;
+}
 
-    LanguageInterpreter* EngineBase::getLanguageInterpreter(const std::string& language)
-    {
-        std::map<edouble, LanguageInterpreter*>::iterator it = getLanguageInterpreters().find(LabelStr(language));
-        if(it != getLanguageInterpreters().end()) 
-            return it->second;
+LanguageInterpreter* EngineBase::getLanguageInterpreter(const std::string& language) {
+  std::map<std::string, LanguageInterpreter*>::iterator it =
+      getLanguageInterpreters().find(language);
+  if(it != getLanguageInterpreters().end()) 
+    return it->second;
 
-        return NULL;
-    }
+  return NULL;
+}
 
-    std::map<edouble, LanguageInterpreter*>& EngineBase::getLanguageInterpreters()
-    {
-        return m_languageInterpreters;
-    }
+std::map<std::string, LanguageInterpreter*>& EngineBase::getLanguageInterpreters() {
+  return m_languageInterpreters;
+}
 
-    void EngineBase::addComponent(const std::string& name,EngineComponent* component)
-    {
-        std::map<edouble, EngineComponent*>::iterator it = getComponents().find(LabelStr(name));
-        if(it == getComponents().end())
-          getComponents().insert(std::make_pair(LabelStr(name), component));
-        else {
-          delete it->second;
-          it->second = component;
-        }
-        component->setEngine(getId());
-    }
+void EngineBase::addComponent(const std::string& name,EngineComponent* component) {
+  std::map<std::string, EngineComponent*>::iterator it = getComponents().find(name);
+  if(it == getComponents().end())
+    getComponents().insert(std::make_pair(name, component));
+  else {
+    delete it->second;
+    it->second = component;
+  }
+  component->setEngine(getId());
+}
 
-    EngineComponent* EngineBase::getComponent(const std::string& name)
-    {
-      std::map<edouble, EngineComponent*>::iterator it = getComponents().find(LabelStr(name));
-      if(it != getComponents().end()) 
-          return it->second;
+EngineComponent* EngineBase::getComponent(const std::string& name) {
+  std::map<std::string, EngineComponent*>::iterator it = getComponents().find(name);
+  if(it != getComponents().end()) 
+    return it->second;
 
-  	  return NULL;
-    }
+  return NULL;
+}
 
-    const EngineComponent* EngineBase::getComponent(const std::string& name) const
-    {
-      std::map<edouble, EngineComponent*>::const_iterator it = m_components.find(LabelStr(name));
-      if(it != m_components.end()) 
-          return it->second;
+const EngineComponent* EngineBase::getComponent(const std::string& name) const {
+  std::map<std::string, EngineComponent*>::const_iterator it = m_components.find(name);
+  if(it != m_components.end()) 
+    return it->second;
 
-      return NULL;
-    }
+  return NULL;
+}
 
-    EngineComponent* EngineBase::removeComponent(const std::string& name)
-    {
-        EngineComponent* c = getComponent(name);
-
-        if (c != NULL)
-            getComponents().erase(LabelStr(name));
-
-        static EngineId s_nullEngineId;
-        c->setEngine(s_nullEngineId);
-        return c;
-    }    
+EngineComponent* EngineBase::removeComponent(const std::string& name) {
+  static EngineId s_nullEngineId;
+  EngineComponent* c = getComponent(name);
+  
+  if (c != NULL) {
+    getComponents().erase(name);
+    c->setEngine(s_nullEngineId);
+  }
+  return c;
+}    
     
-    std::map<edouble, EngineComponent*>& EngineBase::getComponents()
-    {
-        return m_components;
-    }
+std::map<std::string, EngineComponent*>& EngineBase::getComponents() {
+  return m_components;
+}
 
-    void LanguageInterpreter::setEngine(EngineId& engine)
+    void LanguageInterpreter::setEngine(EngineId engine)
     {
         m_engine = engine;
     }
 
-    EngineId& LanguageInterpreter::getEngine()
+    EngineId LanguageInterpreter::getEngine()
     {
         return m_engine;
     }

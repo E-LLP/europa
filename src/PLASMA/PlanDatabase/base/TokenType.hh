@@ -1,9 +1,8 @@
-#ifndef _H_TokenType
-#define _H_TokenType
+#ifndef H_TokenType
+#define H_TokenType
 
 #include "PlanDatabaseDefs.hh"
-#include "LabelStr.hh"
-//#include "TokenTypeMgr.hh"
+#include "PSList.hh"
 #include <map>
 #include <vector>
 
@@ -14,6 +13,7 @@
  * @see DbClient
  */
 namespace EUROPA {
+class PSDataType;
 
   /** Version of TokenType for communication with other languages */
   class PSTokenType {
@@ -46,75 +46,76 @@ namespace EUROPA {
   /**
    * @brief Each concrete class must provide an implementation for this.
    */
-  class TokenType: public PSTokenType {
-  public:
-    TokenType(const ObjectTypeId& ot,const LabelStr& signature);
+class TokenType: public PSTokenType {
+ public:
+  TokenType(const ObjectTypeId ot,const std::string& signature);
 
-    virtual ~TokenType();
+  virtual ~TokenType();
 
-    void addArg(const DataTypeId& type, const LabelStr& name);
+  void addArg(const DataTypeId type, const std::string& name);
 
-    const LabelStr& getPredicateName() const;
-    std::string toString() const;
-    std::string toLongString() const;
+  const std::string& getPredicateName() const;
+  std::string toString() const;
+  std::string toLongString() const;
 
-    // From PSTokenType
-    const std::string& getName() const { return getPredicateName().toString(); }
-    const std::map<LabelStr,DataTypeId>& getArgs() const;
-    const DataTypeId& getArgType(const char* argName) const;
+  // From PSTokenType
+  const std::string& getName() const { return getPredicateName(); }
+  const std::map<std::string,DataTypeId>& getArgs() const;
+  const DataTypeId getArgType(const std::string& argName) const;
 
-    const TokenTypeId& getId() const;
+  const TokenTypeId getId() const;
 
-    const TokenTypeId& getParentType() const;
+  const TokenTypeId getParentType() const;
 
-    const ObjectTypeId& getObjectType() const;
+  const ObjectTypeId getObjectType() const;
 
-    /**
-     * @brief Return the type for which this type is registered.
-     */
-    const LabelStr& getSignature() const;
+  /**
+   * @brief Return the type for which this type is registered.
+   */
+  const std::string& getSignature() const;
 
-    /**
-     * @brief Create a root token instance
-     * @see DbClient::createInstance(const LabelStr& type, const LabelStr& name)
-     */
-    virtual TokenId createInstance(const PlanDatabaseId& planDb,
-                                   const LabelStr& name,
-                                   bool rejectable = false,
-                                   bool isFact = false) const = 0;
+  /**
+   * @brief Create a root token instance
+   * @see DbClient::createInstance(const std::string& type, const std::string& name)
+   */
+  virtual TokenId createInstance(const PlanDatabaseId planDb,
+                                 const std::string& name,
+                                 bool rejectable = false,
+                                 bool isFact = false) const = 0;
 
-    /**
-     * @brief Create a slave token
-     */
-    virtual TokenId createInstance(const TokenId& master, const LabelStr& name, const LabelStr& relation) const = 0;
+  /**
+   * @brief Create a slave token
+   */
+  virtual TokenId createInstance(const TokenId master, const std::string& name,
+                                 const std::string& relation) const = 0;
 
-    // From PSTokenType
-    virtual PSList<std::string> getParameterNames() const;
-    virtual PSDataType* getParameterType(int index) const;
-    virtual PSDataType* getParameterType(const std::string& name) const;
+  // From PSTokenType
+  virtual PSList<std::string> getParameterNames() const;
+  virtual PSDataType* getParameterType(int index) const;
+  virtual PSDataType* getParameterType(const std::string& name) const;
 
-    // See PSTokenType::TokenAttribute
-    virtual int getAttributes() const;
-    virtual void setAttributes(int attrs);
-    virtual void addAttributes(int attrMask);
-    virtual bool hasAttributes( int attrMask ) const;
+  // See PSTokenType::TokenAttribute
+  virtual int getAttributes() const;
+  virtual void setAttributes(int attrs);
+  virtual void addAttributes(int attrMask);
+  virtual bool hasAttributes( int attrMask ) const;
 
-    virtual PSList<PSTokenType*> getSubgoalsByAttr( int attrMask ) const;
+  virtual PSList<PSTokenType*> getSubgoalsByAttr( int attrMask ) const;
 
-  protected:
+ protected:
 
-    void addSubgoalByAttr( TokenTypeId type, int attr );
+  void addSubgoalByAttr( TokenTypeId type, int attr );
 
-    TokenTypeId m_id;
-    ObjectTypeId m_objType;
-    LabelStr m_signature;
-    LabelStr m_predicateName;
-    int m_attributes;
-    std::map<LabelStr,DataTypeId> m_args;
+  TokenTypeId m_id;
+  ObjectTypeId m_objType;
+  std::string m_signature;
+  std::string m_predicateName;
+  int m_attributes;
+  std::map<std::string,DataTypeId> m_args;
 
-    std::map< int, PSList<PSTokenType*> > m_subgoalsByAttr;
+  std::map< int, PSList<PSTokenType*> > m_subgoalsByAttr;
 
-  };
+};
 }
 
 #endif //  H_TokenType

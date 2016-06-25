@@ -45,7 +45,7 @@ namespace EUROPA {
     /**
      * @brief Used to store guard entry data - var name and expected value to match on.
      */
-    typedef std::pair<LabelStr, edouble> GuardEntry;
+  typedef std::pair<std::string, edouble> GuardEntry;
 
     static Priority & worstCasePriority() {
       static Priority sl_worstCasePriority(99999);
@@ -57,11 +57,11 @@ namespace EUROPA {
       return sl_bestCasePriority;
     }
   
-    inline const Priority getBestCasePriority() {
+    inline Priority getBestCasePriority() {
       return bestCasePriority();
     }
 
-    inline const Priority getWorstCasePriority() {
+    inline Priority getWorstCasePriority() {
       return worstCasePriority();
     }
 

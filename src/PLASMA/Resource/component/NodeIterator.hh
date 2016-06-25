@@ -13,15 +13,9 @@
 
 namespace EUROPA
 {
-    /**
-     * @brief
-     */
     class NodeIterator
     {
     public:
-      /**
-       * @brief
-       */
       NodeIterator( const Graph& graph, bool mustBeEnabled = true ):
 	m_Iterator( graph.m_Nodes.begin() ),
 	m_End( graph.m_Nodes.end() ),
@@ -33,17 +27,8 @@ namespace EUROPA
 	      ++m_Iterator;
 	  }
       }
-      /**
-       * @brief
-       */
       inline bool ok() const;
-      /**
-       * @brief
-       */
-      inline void operator++();
-      /**
-       * @brief
-       */
+      inline NodeIterator& operator++();
       inline Node* operator*() const;
     private:
       NodeIdentity2Node::const_iterator m_Iterator;
@@ -56,16 +41,16 @@ namespace EUROPA
       return m_Iterator != m_End;
     }
 
-    void NodeIterator::operator++()
-    {
-      ++m_Iterator;
+NodeIterator& NodeIterator::operator++() {
+  ++m_Iterator;
 
-      if( m_Enabled )
-	{
-	  while( m_Iterator != m_End && !(*m_Iterator).second->isEnabled() )
-	    ++m_Iterator;
-	}
-    }
+  if( m_Enabled )
+  {
+    while( m_Iterator != m_End && !(*m_Iterator).second->isEnabled() )
+      ++m_Iterator;
+  }
+  return *this;
+}
 
     Node* NodeIterator::operator*() const
     {

@@ -3,7 +3,6 @@
 #define EUROPA_TOKENTYPE_MGR_H
 
 #include "PlanDatabaseDefs.hh"
-#include "LabelStr.hh"
 #include "TokenType.hh"
 #include "Utils.hh"
 
@@ -14,13 +13,13 @@ namespace EUROPA {
    * on binding to concrete token types for easy distinct class.
    * @see TokenType
    */
-  class TokenTypeMgr {
-  public:
+class TokenTypeMgr {
+ public:
 
   TokenTypeMgr();
   ~TokenTypeMgr();
 
-  const TokenTypeMgrId& getId() const;
+  const TokenTypeMgrId getId() const;
 
   void purgeAll();
 
@@ -32,18 +31,18 @@ namespace EUROPA {
   /**
    * @brief Add a factory to provide instantiation of particular concrete types based on a label.
    */
-  void registerType(const TokenTypeId& type );
+  void registerType(const TokenTypeId type );
 
   /**
    * @brief Obtain the factory based on the predicate name
    */
-  TokenTypeId getType(const SchemaId& schema, const LabelStr& predicateName);
+  TokenTypeId getType(const SchemaId schema, const std::string& predicateName);
 
-  protected:
-	  TokenTypeMgrId m_id;
-	  std::map<edouble, TokenTypeId> m_typesByPredicate;
-	  std::set<TokenTypeId> m_types;
-  };
+ protected:
+  TokenTypeMgrId m_id;
+  std::map<std::string, TokenTypeId> m_typesByPredicate;
+  std::set<TokenTypeId> m_types;
+};
 
 } //namespace EUROPA
 

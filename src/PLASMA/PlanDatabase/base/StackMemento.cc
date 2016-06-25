@@ -9,8 +9,9 @@
 
 namespace EUROPA{
 
-  StackMemento::StackMemento(const TokenId& activeTokenToStack, const TokenId& activeToken)
-    :m_activeTokenToStack(activeTokenToStack), m_activeToken(activeToken){
+  StackMemento::StackMemento(const TokenId activeTokenToStack, const TokenId activeToken)
+      :m_activeTokenToStack(activeTokenToStack), m_activeToken(activeToken),
+       m_stackConstraints() {
 
     // Iterate over all variables and impose equivalence constraints
     // between the corresponding variables
@@ -27,7 +28,7 @@ namespace EUROPA{
       newScope.push_back(stackVariables[i]);
       newScope.push_back(activeVariables[i]);
       ConstraintId newConstraint = m_activeToken->getPlanDatabase()->getConstraintEngine()->createConstraint(
-                                      LabelStr("eq"),
+                                      "eq",
           							  newScope);
       check_error(newConstraint.isValid());
       m_stackConstraints.push_back(newConstraint);
@@ -39,16 +40,10 @@ namespace EUROPA{
   void StackMemento::undo(bool){
     check_error(!m_stackConstraints.empty());
     // Delete all new constraints.
-    for(std::list<ConstraintId>::const_iterator it = m_stackConstraints.begin(); it!= m_stackConstraints.end(); ++it) {
-      ConstraintId constraint = *it;
-      check_error(constraint.isValid());
-      delete (Constraint*) constraint;
-    }
-
-    m_stackConstraints.clear();
+    cleanup(m_stackConstraints);
   }
 
-  void StackMemento::handleAdditionOfInactiveConstraint(const ConstraintId& constraint){ }
+  void StackMemento::handleAdditionOfInactiveConstraint(const ConstraintId){ }
 
-  void StackMemento::handleRemovalOfInactiveConstraint(const ConstraintId& constraint){ }
+  void StackMemento::handleRemovalOfInactiveConstraint(const ConstraintId){ }
 }

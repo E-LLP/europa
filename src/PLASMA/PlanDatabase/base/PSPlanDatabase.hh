@@ -1,17 +1,17 @@
-#ifndef _H_PSPlanDatabase
-#define _H_PSPlanDatabase
+#ifndef H_PSPlanDatabase
+#define H_PSPlanDatabase
 
 #include "PSConstraintEngine.hh"
 #include "ConstraintEngineDefs.hh"
-#include "TokenType.hh"
-#include "ObjectType.hh"
 
 namespace EUROPA {
 	enum PSTokenState { INACTIVE,ACTIVE,MERGED,REJECTED };
 
-  class PSObject;
-  class PSToken;
-  class PSPlanDatabaseClient;
+class PSObject;
+class PSObjectType;
+class PSToken;
+class PSTokenType;
+class PSPlanDatabaseClient;
 
   class PSSchema : public EngineComponent
   {
@@ -19,7 +19,7 @@ namespace EUROPA {
         // TODO: flesh this interface out
       virtual ~PSSchema() {}
       virtual PSList<std::string> getAllPredicates() const = 0;
-      virtual PSList<std::string> getMembers(const std::string& objectType) const = 0;
+      virtual PSList<std::string> getObjectMembers(const std::string& objectType) const = 0;
       virtual bool hasMember(const std::string& parentType, const std::string& memberName) const = 0;
 
       virtual PSList<PSObjectType*> getAllPSObjectTypes() const = 0;

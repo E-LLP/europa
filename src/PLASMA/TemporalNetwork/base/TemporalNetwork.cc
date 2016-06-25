@@ -16,50 +16,54 @@
 #include "TemporalNetwork.hh"
 #include "Debug.hh"
 
+#include <boost/cast.hpp>
+#include <boost/make_shared.hpp>
+
 namespace EUROPA {
 
-  Bool TemporalNetwork::isValidId(const TimepointId& id){
-    return (id.isValid() &&
+  Bool TemporalNetwork::isValidId(const TimepointId id){
+    return (id &&
 	    id->owner == this && hasNode(id) &&
 	    hasNode(id));
   }
 
-  Bool TemporalNetwork::isValidId(const TemporalConstraintId& id){
-    return (id.isValid() && id->owner == this);
+  Bool TemporalNetwork::isValidId(const TemporalConstraintId id){
+    return (id && id->owner == this);
   }
 
-  bool TemporalNetwork::hasEdgeToOrigin(const TimepointId& timepoint) {
+  bool TemporalNetwork::hasEdgeToOrigin(const TimepointId timepoint) {
     // Order of operands is important for speed. Should be faster to look towards the origin
     DedgeId edgeToTheOrigin = findEdge(timepoint, getOrigin());
-    checkError(edgeToTheOrigin.isNoId() || edgeToTheOrigin.isValid(), edgeToTheOrigin);
-    return edgeToTheOrigin.isId();
+    checkError(edgeToTheOrigin == NULL || edgeToTheOrigin, edgeToTheOrigin);
+    return edgeToTheOrigin != NULL;
   }
 
-  TemporalNetwork::TemporalNetwork() :   m_id(this)
-  {
-    consistent=true; hasDeletions=false; nodeCounter=0;
-    addTimepoint();
-    fullPropagate();
-  }
+TemporalNetwork::TemporalNetwork() : consistent(true), 
+                                     hasDeletions(false), nodeCounter(0),
+                                     incrementalSource(), m_constraints(), m_id(this),
+                                     m_refpoint(), m_updatedTimepoints() {
+
+  addTimepoint();
+  fullPropagate();
+}
 
   TemporalNetwork::~TemporalNetwork()
   {
     for(std::set<TemporalConstraintId>::const_iterator it = m_constraints.begin(); it != m_constraints.end(); ++it){
       TemporalConstraintId constraint = *it;
-      check_error(constraint.isValid());
-      constraint->discard();
+      check_error(constraint);
+      constraint->discard(false);
     }
 
-    m_id.remove();
   }
 
   DnodeId TemporalNetwork::makeNode()
   {
     // Overrides the definition in DistanceGraph class.
-    TimepointId node = (new Tnode(this))->getId();
+    TimepointId node = boost::make_shared<Tnode>(this);
     // PHM Support for reftime calculations
     node->prev_reftime = TIME_MAX; // will never == reftime
-    if (m_refpoint.isId()) {
+    if (m_refpoint != NULL) {
       if (m_refpoint->inCount == 0)
 	node->reftime = POS_INFINITY;
       else
@@ -74,7 +78,7 @@ namespace EUROPA {
     return (next == this->incrementalSource);
   }
 
-  Void TemporalNetwork::getTimepointBounds(const TimepointId& id, Time& lb, Time& ub)
+  Void TemporalNetwork::getTimepointBounds(const TimepointId id, Time& lb, Time& ub)
   {
     // We need to be up-to-date to get the bounds.  Because of eager
     // prop on consistent additions, we only need to prop if there are
@@ -95,7 +99,7 @@ namespace EUROPA {
     }
   }
 
-  Void TemporalNetwork::getLastTimepointBounds(const TimepointId& node, Time& lb, Time& ub)
+  Void TemporalNetwork::getLastTimepointBounds(const TimepointId node, Time& lb, Time& ub)
   {
     check_error(( this->isValidId(node) ),
                 "TemporalNetwork: Invalid timepoint identifier",
@@ -105,19 +109,19 @@ namespace EUROPA {
     ub = node->upperBound;
   }
 
-  Time TemporalNetwork::getLowerTimepointBound(const TimepointId& id) {
+  Time TemporalNetwork::getLowerTimepointBound(const TimepointId id) {
     Time result, junk;
     getTimepointBounds(id, result, junk);
     return(result);
   }
 
-  Time TemporalNetwork::getUpperTimepointBound(const TimepointId& id) {
+  Time TemporalNetwork::getUpperTimepointBound(const TimepointId id) {
     Time result, junk;
     getTimepointBounds(id, junk, result);
     return(result);
   }
 
-  Bool TemporalNetwork::isDistanceLessThan (const TimepointId& from, const TimepointId& to,
+  Bool TemporalNetwork::isDistanceLessThan (const TimepointId from, const TimepointId to,
 					    Time bound)
   {
     propagate();
@@ -125,20 +129,21 @@ namespace EUROPA {
     check_error(this->consistent,
                 "TemporalNetwork: Checking distance in inconsistent network",
                 TempNetErr::TempNetInconsistentError());
-    DistanceGraph* graph = (DistanceGraph*) this;
-    return graph->isDistanceLessThan(from, to, bound);
+    return DistanceGraph::isDistanceLessThan(from, to, bound);
+    // DistanceGraph* graph = boost::polymorphic_cast<DistanceGraph*>(this);
+    // return graph->isDistanceLessThan(from, to, bound);
   }
 
 
-  Bool TemporalNetwork::isDistanceLessThanOrEqual (const TimepointId& from,
-						   const TimepointId& to,
+  Bool TemporalNetwork::isDistanceLessThanOrEqual (const TimepointId from,
+						   const TimepointId to,
 						   Time bound)
   {
     return isDistanceLessThan(from, to, bound + TIME_TICK);
   }
 
-  Bool TemporalNetwork::isDistancePossiblyLessThan (const TimepointId& src,
-						    const TimepointId& dest,
+  Bool TemporalNetwork::isDistancePossiblyLessThan (const TimepointId src,
+						    const TimepointId dest,
 						    Time bound)
   {
     // An efficient approximate version of isDistanceLessThan.
@@ -210,7 +215,7 @@ namespace EUROPA {
     return this->consistent;
   }
 
-  Void TemporalNetwork::calcDistanceBounds(const TimepointId& src, const TimepointId& targ,
+  Void TemporalNetwork::calcDistanceBounds(const TimepointId src, const TimepointId targ,
 					   Time& lb, Time& ub, Bool exact)
   {
     propagate();
@@ -235,11 +240,11 @@ namespace EUROPA {
       DedgeId forwardEdge = findEdge (src,targ);
       DedgeId reverseEdge = findEdge (targ,src);
       //      if (forwardEdge != nullptr || reverseEdge != nullptr) {
-      if (!forwardEdge.isNoId())
+      if (forwardEdge != NULL)
 	ub = forwardEdge->length;
       else
 	ub = POS_INFINITY;
-      if (!reverseEdge.isNoId())
+      if (reverseEdge != NULL)
 	lb = - (reverseEdge->length);
       else
 	lb = NEG_INFINITY;
@@ -254,24 +259,24 @@ namespace EUROPA {
     lb = - getDistance(src);
   }
 
-  Void TemporalNetwork::propagateBoundsFrom (const TimepointId& src)
+  Void TemporalNetwork::propagateBoundsFrom (const TimepointId src)
   {
     for(std::vector<DnodeId>::const_iterator it = nodes.begin(); it != nodes.end(); ++it){
-      TimepointId node = (TimepointId) *it;
+      const TimepointId node = boost::dynamic_pointer_cast<Timepoint>(*it);
       node->upperBound = POS_INFINITY;
       node->lowerBound = NEG_INFINITY;
     }
     src->upperBound = 0;
     src->lowerBound = 0;
     src->depth = 0;
-    BucketQueue* queue = initializeBqueue();
-    queue->insertInQueue(src);
+    BucketQueue& queue = initializeBqueue();
+    queue.insertInQueue(src);
     incDijkstraForward();
-    queue->insertInQueue(src);
+    queue.insertInQueue(src);
     incDijkstraBackward();
   }
 
-  Void TemporalNetwork::calcDistanceBounds(const TimepointId& src,
+  Void TemporalNetwork::calcDistanceBounds(const TimepointId src,
                                            const std::vector<TimepointId>&
                                            targs,
 					   std::vector<Time>& lbs,
@@ -300,7 +305,7 @@ namespace EUROPA {
     return;
   }
 
-  Void TemporalNetwork::calcDistanceSigns(const TimepointId& src,
+  Void TemporalNetwork::calcDistanceSigns(const TimepointId src,
                                            const std::vector<TimepointId>&
                                            targs,
 					   std::vector<Time>& lbs,
@@ -354,50 +359,49 @@ namespace EUROPA {
 
 
   std::list<TimepointId>
-  TemporalNetwork::getConstraintScope(const TemporalConstraintId& id) {
+  TemporalNetwork::getConstraintScope(const TemporalConstraintId id) {
     std::list<TimepointId> result;
 
-    if(id.isInvalid())
-      handle_error(is.isInvalid(),
-                   "Cannot get scope of invalid constraint.",
-                   TempNetErr::TempNetInvalidConstraintError());
+    if(id == NULL) {
+      check_error(id == NULL,
+                  "Cannot get scope of invalid constraint.",
+                  TempNetErr::TempNetInvalidConstraintError());
+    }
 
-    Tspec* spec = id.operator->();
-    result.push_back(spec->head->getId());
-    result.push_back(spec->foot->getId());
+    result.push_back(id->head);
+    result.push_back(id->foot);
     return(result);
   }
 
-  void TemporalNetwork::getConstraintScope(const TemporalConstraintId& constraint, TimepointId& source, TimepointId& target) const{
-    check_error(constraint.isValid());
-    Tspec* spec = (Tspec*) constraint;
-    source = spec->head->getId();
-    target = spec->foot->getId();
+  void TemporalNetwork::getConstraintScope(const TemporalConstraintId constraint,
+                                           TimepointId& source,
+                                           TimepointId& target) const{
+    check_error(constraint != NULL);
+    source = constraint->head;
+    target = constraint->foot;
   }
 
   Time
-  TemporalNetwork::getConstraintUpperBound(const TemporalConstraintId& id) {
-    if(id.isInvalid())
-      handle_error(id.isInvalid(),
+  TemporalNetwork::getConstraintUpperBound(const TemporalConstraintId id) {
+    if(id == NULL)
+      check_error(id == NULL,
                    "Cannot get scope of invalid constraint.",
                    TempNetErr::TempNetInvalidConstraintError());
 
-    Tspec* spec = id.operator->();
-    return(spec->upperBound);
+    return(id->upperBound);
   }
 
 
   Time
-  TemporalNetwork::getConstraintLowerBound(const TemporalConstraintId& id) {
-    if(id.isInvalid())
-      handle_error(id.isInvalid(),
+  TemporalNetwork::getConstraintLowerBound(const TemporalConstraintId id) {
+    if(id == NULL)
+      check_error(id == NULL,
                    "Cannot get scope of invalid constraint.",
                    TempNetErr::TempNetInvalidConstraintError());
-    Tspec* spec = id.operator->();
-    return(spec->lowerBound);
+    return(id->lowerBound);
   }
 
-#ifdef _EUROPA_NO_ERROR_CHECKS_
+#ifdef EUROPA_NO_ERROR_CHECKS_
 # define checkBoundsValidity(lo, hi) (true)
 #else
   static Bool checkBoundsValidity(const Time lb, const Time ub) {
@@ -420,63 +424,62 @@ namespace EUROPA {
   }
 #endif
 
-  TemporalConstraintId TemporalNetwork::addTemporalConstraint(const TimepointId& src,
-							      const TimepointId& targ,
-							      const Time _lb,
-							      const Time _ub,
-							      bool propagate) {
-    const Time lb = mapToInternalInfinity(_lb);
-    const Time ub = mapToInternalInfinity(_ub);
-    if (!checkBoundsValidity(lb, ub))
-      return(TemporalConstraintId::noId());
+TemporalConstraintId TemporalNetwork::addTemporalConstraint(const TimepointId src,
+                                                            const TimepointId targ,
+                                                            const Time _lb,
+                                                            const Time _ub,
+                                                            bool _propagate) {
+  const Time lb = mapToInternalInfinity(_lb);
+  const Time ub = mapToInternalInfinity(_ub);
+  if (!checkBoundsValidity(lb, ub))
+    return TemporalConstraintId();
 
-    check_error(isValidId(src),
-                "addTemporalConstraint:  Invalid source timepoint",
-                TempNetErr::TempNetInvalidTimepointError());
-    check_error(isValidId(targ),
-                "addTemporalConstraint:  Invalid target timepoint",
-                TempNetErr::TempNetInvalidTimepointError());
-    check_error( (src != targ),
-                 "addTemporalConstraint:  source and target are the same",
-                 TempNetErr::TempNetEmptyConstraintError());
-    maintainTEQ (lb,ub,src,targ);
+  check_error(isValidId(src),
+              "addTemporalConstraint:  Invalid source timepoint",
+              TempNetErr::TempNetInvalidTimepointError());
+  check_error(isValidId(targ),
+              "addTemporalConstraint:  Invalid target timepoint",
+              TempNetErr::TempNetInvalidTimepointError());
+  check_error( (src != targ),
+               "addTemporalConstraint:  source and target are the same",
+               TempNetErr::TempNetEmptyConstraintError());
+  maintainTEQ (lb,ub,src,targ);
 
-    unsigned short edgeCount = 0;
+  unsigned short edgeCount = 0;
 
-    if (ub <= MAX_LENGTH){
-      addEdgeSpec(src, targ, ub);
-      edgeCount++;
-    }
-
-    if(lb >= MIN_LENGTH){
-      edgeCount++;
-      addEdgeSpec(targ, src, -lb);
-    }
-
-    Tspec* spec = new Tspec (this, src, targ, lb, ub, edgeCount);
-
-    m_constraints.insert(spec->getId());
-
-    // As long as propagation is not turned off, we can process this constraint
-    if (propagate){
-      incPropagate(src, targ);
-    }
-
-    return(spec->getId());
+  if (ub <= MAX_LENGTH){
+    addEdgeSpec(src, targ, ub);
+    edgeCount++;
   }
 
-  Void TemporalNetwork::narrowTemporalConstraint(const TemporalConstraintId& tcId,
+  if(lb >= MIN_LENGTH){
+    edgeCount++;
+    addEdgeSpec(targ, src, -lb);
+  }
+
+  TemporalConstraintId spec = boost::make_shared<Tspec>(this, src, targ, lb, ub, edgeCount);
+
+  m_constraints.insert(spec);
+
+  // As long as propagation is not turned off, we can process this constraint
+  if (_propagate){
+    incPropagate(src, targ);
+  }
+
+  return(spec);
+}
+
+  Void TemporalNetwork::narrowTemporalConstraint(const TemporalConstraintId spec,
 						 const Time newLb, const Time newUb)
   {
-    check_error(tcId.isValid());
+    check_error(spec);
     if (!checkBoundsValidity(newLb, newUb))
       return;
 
-    check_error(isValidId(tcId),
+    check_error(isValidId(spec),
                 "narrowTemporalConstraint:  Invalid TemporalConstraint",
                 TempNetErr::TempNetInvalidConstraintError());
 
-    Tspec* spec = tcId.operator->();
     Time oldLb = spec->lowerBound;
     Time oldUb = spec->upperBound;
 
@@ -509,18 +512,18 @@ namespace EUROPA {
     spec->lowerBound = newLb;
     spec->upperBound = newUb;
 
-    checkError(spec->m_edgeCount >= 0 && spec->m_edgeCount <= 2, "Invalied edge count" <<  spec->m_edgeCount);
+    checkError(spec->m_edgeCount <= 2, "Invalied edge count" <<  spec->m_edgeCount);
 
     if(!this->hasDeletions)
       incPropagate(src, targ);
   }
 
-  Void TemporalNetwork::removeTemporalConstraint(const TemporalConstraintId& tcId, bool markDeleted) {
+  Void TemporalNetwork::removeTemporalConstraint(const TemporalConstraintId spec,
+                                                 bool markDeleted) {
     // Make sure it is valid, including belonging to this id manager
-    check_error(isValidId(tcId),
+    check_error(isValidId(spec),
                 "removeTemporalConstraint: invalid Id",
                 TempNetErr::TempNetInvalidConstraintError());
-    Tspec* spec = tcId.operator->();
     Time lb = spec->lowerBound;
     Time ub = spec->upperBound;
     TimepointId src = spec->head;
@@ -533,24 +536,25 @@ namespace EUROPA {
     if (lb >= MIN_LENGTH)
       removeEdgeSpec(targ, src, -lb);
     this->hasDeletions = this->hasDeletions || markDeleted;
-    m_constraints.erase(spec->getId());
-    spec->discard();
+    m_constraints.erase(spec);
   }
 
   TimepointId TemporalNetwork::getOrigin()
   {
     TimepointId origin = getOriginNode();
-    return origin->getId();
+    return origin;
   }
 
-  TimepointId TemporalNetwork::addTimepoint()
-  {
-    TimepointId node = (TimepointId) createNode();
-    node->ordinal=++(this->nodeCounter);
-    return node->getId();
-  }
+TimepointId TemporalNetwork::addTimepoint() {
+  //this seems terrible.  ~MJI
+  //TimepointId node = boost::polymorphic_cast<TimepointId>(createNode());
+  TimepointId node = boost::make_shared<Tnode>(this);
+  addNode(node);
+  node->ordinal=++(this->nodeCounter);
+  return node;
+}
 
-  Void TemporalNetwork::deleteTimepoint(const TimepointId& node)
+  Void TemporalNetwork::deleteTimepoint(const TimepointId node)
   {
     check_error(isValidId(node),
                 "TemporalNetwork:: deleting invalid timepoint.",
@@ -577,8 +581,8 @@ namespace EUROPA {
     for (std::list<DedgeId>::const_iterator it=edgeNogoodList.begin();
 	 it != edgeNogoodList.end(); ++it) {
       DedgeId edge = *it;
-      TimepointId node = (TimepointId) edge->to;
-      ans.push_back(node->getId());
+      TimepointId node = boost::dynamic_pointer_cast<Timepoint>(edge->to);
+      ans.push_back(node);
     }
     return ans;
   }
@@ -598,14 +602,14 @@ namespace EUROPA {
   }
 
   TimepointId TemporalNetwork::getOriginNode() const {
-    return this->nodes.front();
+    return boost::dynamic_pointer_cast<Timepoint>(this->nodes.front());
   }
 
   Void TemporalNetwork::fullPropagate()
   {
     debugMsg("TemporalNetwork:fullPropagate", "fullPropagate started");
     m_updatedTimepoints.clear();
-    this->incrementalSource = TimepointId::noId();   // Not applicable to a full prop.
+    this->incrementalSource.reset();   // Not applicable to a full prop.
     setConsistency(bellmanFord());
     this->hasDeletions = false;
     if (this->consistent == false)
@@ -615,7 +619,7 @@ namespace EUROPA {
     // and backward directions to update the lower/upper bounds.
     // Note: these could be done lazily on request for bounds.
     for(std::vector<DnodeId>::const_iterator it = nodes.begin(); it != nodes.end(); ++it){
-      TimepointId node = (TimepointId) *it;
+      TimepointId node = boost::dynamic_pointer_cast<Timepoint>(*it);
       node->upperBound = POS_INFINITY;
       node->lowerBound = NEG_INFINITY;
     }
@@ -625,14 +629,14 @@ namespace EUROPA {
     origin->lowerBound = 0;
     origin->depth = 0;
 
-    BucketQueue* queue = initializeBqueue();
-    queue->insertInQueue(origin);
+    BucketQueue& queue = initializeBqueue();
+    queue.insertInQueue(origin);
     incDijkstraForward();
-    queue->insertInQueue(origin);
+    queue.insertInQueue(origin);
     incDijkstraBackward();
 
     // PHM 6/29/2010 Changes to support reftime calculations
-    if (m_refpoint.isId()) {
+    if (m_refpoint) {
 
       // We may use either all lower bounds or all upper bounds for
       // preferred time constraints.  Code adjusts to either case.
@@ -641,12 +645,12 @@ namespace EUROPA {
 	(m_refpoint->inCount == 0) ? POS_INFINITY : NEG_INFINITY;
 
       for (unsigned i=0; i < nodes.size(); i++) {
-	TimepointId node = (TimepointId) nodes[i];
+	TimepointId node = boost::dynamic_pointer_cast<Timepoint>(nodes[i]);
 	node->reftime = initref;
       }
       m_refpoint->reftime = 0;
       m_refpoint->depth = 0;
-      queue->insertInQueue(m_refpoint);
+      queue.insertInQueue(m_refpoint);
 
       if (m_refpoint->inCount == 0)
 	incDijkstraReftime();
@@ -668,16 +672,16 @@ namespace EUROPA {
     check_error(isValidId(src));
     check_error(isValidId(targ));
 
-    BucketQueue* queue = initializeBqueue();
+    BucketQueue& queue = initializeBqueue();
     TimepointId next;
 
-    next = startNode(src, src->potential, targ, targ->potential);
-    if (!next.isNoId()) {
+    next = boost::dynamic_pointer_cast<Timepoint>(startNode(src, src->potential, targ, targ->potential));
+    if (next != NULL) {
       TimepointId start = (next == src) ? targ : src;
       incrementalSource = start;  // Used in specialized cycle detection
       next->predecessor = findEdge(start,next);  // Used to trace nogood
       handleNodeUpdate(next);
-      queue->insertInQueue(next);
+      queue.insertInQueue(next);
       setConsistency(incBellmanFord());
     }
 
@@ -688,11 +692,12 @@ namespace EUROPA {
     // Now we need to do specialized Dijkstras in the forward
     // and backward directions to update the lower/upper bounds.
 
-    BucketQueue* queue1 = initializeBqueue();
+    BucketQueue& queue1 = initializeBqueue();
 
-    next = startNode(src, src->upperBound, targ, targ->upperBound);
-    if (!next.isNoId()) {
-      queue1->insertInQueue(next);
+    next =
+        boost::dynamic_pointer_cast<Timepoint>(startNode(src, src->upperBound, targ, targ->upperBound));
+    if (next != NULL) {
+      queue1.insertInQueue(next);
       handleNodeUpdate(next);
       incDijkstraForward();
     }
@@ -705,25 +710,27 @@ namespace EUROPA {
     Time footDistance = -(targ->lowerBound);
 
     // Backwards propagation, so call with "forward" flag false.
-    next = startNode(src, headDistance, targ, footDistance, false);
-    if (!next.isNoId()) {
+    next = boost::dynamic_pointer_cast<Timepoint>(startNode(src, headDistance, targ,
+                                                            footDistance, false));
+    if (next != NULL) {
 
       // Store propagated locals back to proper locations
       src->lowerBound = -(headDistance);
       targ->lowerBound = -(footDistance);
 
-      queue1->insertInQueue(next);
+      queue1.insertInQueue(next);
       handleNodeUpdate(next);
       incDijkstraBackward();
     }
 
     // PHM Support for reftime calculations
     // Adjust to either case of all lb or all ub constraints.
-    if (m_refpoint.isId()) {
+    if (m_refpoint) {
       if (m_refpoint->inCount == 0) { // all ub constraints
-	next = startNode(src, src->reftime, targ, targ->reftime);
-	if (!next.isNoId()) {
-	  queue1->insertInQueue(next);
+	next = boost::dynamic_pointer_cast<Timepoint>(startNode(src, src->reftime,
+                                                                targ, targ->reftime));
+	if (next != NULL) {
+	  queue1.insertInQueue(next);
 	  handleNodeUpdate(next);
 	  incDijkstraReftime();
 	}
@@ -731,11 +738,12 @@ namespace EUROPA {
       else { // all lb constraints
 	headDistance = -(src->reftime);
 	footDistance = -(targ->reftime);
-	next = startNode(src, headDistance, targ, footDistance, false);
-	if (!next.isNoId()) {
+	next = boost::dynamic_pointer_cast<Timepoint>(startNode(src, headDistance,
+                                                                targ, footDistance, false));
+	if (next != NULL) {
 	  src->reftime = -(headDistance);
 	  targ->reftime = -(footDistance);
-	  queue1->insertInQueue(next);
+	  queue1.insertInQueue(next);
 	  handleNodeUpdate(next);
 	  incDijkstraRefBack(); // Backwards propagation
 	}
@@ -754,7 +762,7 @@ namespace EUROPA {
     DedgeId edge = findEdge(forwards ? head : foot,
                             forwards ? foot : head);
 
-    if (!edge.isNoId() && headDistance < POS_INFINITY
+    if (edge != NULL && headDistance < POS_INFINITY
         && headDistance + edge->length < footDistance) {
       // Propagate across edge
       footDistance = headDistance + edge->length;
@@ -767,7 +775,7 @@ namespace EUROPA {
     DedgeId revEdge = findEdge(forwards ? foot : head,
                                forwards ? head : foot);
 
-    if (!revEdge.isNoId() && footDistance < POS_INFINITY
+    if (revEdge != NULL && footDistance < POS_INFINITY
         && footDistance + revEdge->length < headDistance) {
       // Propagate across reverse edge
       headDistance = footDistance + revEdge->length;
@@ -776,77 +784,74 @@ namespace EUROPA {
       return head;  // Continue propagation from head
     }
 
-    return DnodeId::noId();
+    return DnodeId();
   }
 
-  Void TemporalNetwork::incDijkstraForward()
-  {
+Void TemporalNetwork::incDijkstraForward() {
 
+  BucketQueue& queue = *this->bqueue;
+  check_error_variable(unsigned long BFbound = this->nodes.size());
 
-    BucketQueue* queue = this->bqueue;
-#ifndef EUROPA_FAST
-    int BFbound = this->nodes.size();
-#endif
-    while (true) {
-      DnodeId dnode = queue->popMinFromQueue();
-      if (dnode.isNoId())
-	return;
+  while (true) {
+    DnodeId dnode = queue.popMinFromQueue();
+    if (dnode == NULL)
+      return;
 
-      TimepointId node(dnode);
+    TimepointId node = boost::dynamic_pointer_cast<Timepoint>(dnode);
 
-      for (int i=0; i< node->outCount; i++) {
-	DedgeId edge = node->outArray[i];
-	TimepointId next = (TimepointId) edge->to;
-	Time newDistance = node->upperBound + edge->length;
-	if (newDistance < next->upperBound) {
-    check_error(!(newDistance > MAX_DISTANCE || newDistance < MIN_DISTANCE),
-                "Potential over(under)flow during upper bound propagation",
-                TempNetErr::TimeOutOfBoundsError());
-	  // Next check is a failsafe to prevent infinite propagation.
-    check_error(!((next->depth = node->depth + 1) > BFbound),
-                "Dijkstra propagation in inconsistent network",
-                TempNetErr::TempNetInternalError());
-	  next->upperBound = newDistance;
-	  // Appropriate priority key as derived from Johnson's algorithm
-	  queue->insertInQueue (next, newDistance - next->potential);
+    for (int i=0; i< node->outCount; i++) {
+      DedgeId edge = node->outArray[i];
+      TimepointId next = boost::dynamic_pointer_cast<Timepoint>(edge->to);
+      Time newDistance = node->upperBound + edge->length;
+      if (newDistance < next->upperBound) {
+        check_error(!(newDistance > MAX_DISTANCE || newDistance < MIN_DISTANCE),
+                    "Potential over(under)flow during upper bound propagation",
+                    TempNetErr::TimeOutOfBoundsError());
+        // Next check is a failsafe to prevent infinite propagation.
+        check_error(!(static_cast<unsigned>(next->depth = node->depth + 1) > BFbound),
+                    "Dijkstra propagation in inconsistent network",
+                    TempNetErr::TempNetInternalError());
+        next->upperBound = newDistance;
+        // Appropriate priority key as derived from Johnson's algorithm
+        queue.insertInQueue (next, newDistance - next->potential);
 
-	  // Store in set of updated timepoints
-	  handleNodeUpdate(next);
-	}
+        // Store in set of updated timepoints
+        handleNodeUpdate(next);
       }
     }
   }
+}
 
   Void TemporalNetwork::incDijkstraBackward()
   {
 
-    BucketQueue* queue = this->bqueue;
-#ifndef EUROPA_FAST
-    int BFbound = this->nodes.size();
-#endif
+    BucketQueue& queue = *(this->bqueue);
+    check_error_variable(unsigned long BFbound = this->nodes.size());
+
     while (true) {
-      DnodeId dnode =  queue->popMinFromQueue();
-      if(dnode.isNoId())
+      DnodeId dnode =  queue.popMinFromQueue();
+      if(dnode == NULL)
 	return;
 
-      TimepointId node(dnode);
+      TimepointId node = boost::dynamic_pointer_cast<Timepoint>(dnode);
 
       for (int i=0; i< node->inCount; i++) {
 	DedgeId edge = node->inArray[i];
-	TimepointId next = (TimepointId) edge->from;
+	TimepointId next = boost::dynamic_pointer_cast<Timepoint>(edge->from);
 	Time newDistance = -(node->lowerBound) + edge->length;
 	if (newDistance < -(next->lowerBound)) {
     check_error(!(newDistance > MAX_DISTANCE || newDistance < MIN_DISTANCE),
                 "Potential over(under)flow during lower bound propagation",
                 TempNetErr::TimeOutOfBoundsError());
-	  // Next check is a failsafe to prevent infinite propagation.
-    check_error(!((next->depth = node->depth + 1) > BFbound),
+    // Next check is a failsafe to prevent infinite propagation.
+    //but a risky one, since it's got a side effect! ~MJI
+    check_error(!(static_cast<unsigned>(next->depth = node->depth + 1) > BFbound),
                 "Dijkstra propagation in inconsistent network",
                 TempNetErr::TempNetInternalError());
 	  next->lowerBound = -newDistance;
 	  // 12/13/2002 Fix queue key computation.  Correct formula for
 	  // backward prop is key = (distance + potential).
-	  queue->insertInQueue (next, newDistance + next->potential);
+	  queue.insertInQueue (next, newDistance + next->potential);
 
 	  // Store in set of updated timepoints
 	  handleNodeUpdate(next);
@@ -858,30 +863,29 @@ namespace EUROPA {
   Void TemporalNetwork::incDijkstraReftime()
   {
     // PHM New function to support reftime calculations
-    BucketQueue* queue = this->bqueue;
-#ifndef EUROPA_FAST
-    int BFbound = this->nodes.size();
-#endif
+    BucketQueue& queue = *(this->bqueue);
+    check_error_variable(unsigned long BFbound = this->nodes.size());
+
     while (true) {
-      DnodeId dnode = queue->popMinFromQueue();
-      if (dnode.isNoId())
+      DnodeId dnode = queue.popMinFromQueue();
+      if (dnode == NULL)
 	return;
-      TimepointId node(dnode);
+      TimepointId node = boost::dynamic_pointer_cast<Timepoint>(dnode);
       for (int i=0; i< node->outCount; i++) {
 	DedgeId edge = node->outArray[i];
-	TimepointId next = (TimepointId) edge->to;
+	TimepointId next = boost::dynamic_pointer_cast<Timepoint>(edge->to);
 	Time newDistance = node->reftime + edge->length;
 	if (newDistance < next->reftime) {
 	  check_error(!(newDistance > MAX_DISTANCE || newDistance < MIN_DISTANCE),
 		      "Potential over(under)flow during upper bound propagation",
 		      TempNetErr::TimeOutOfBoundsError());
 	  // Next check is a failsafe to prevent infinite propagation.
-	  check_error(!((next->depth = node->depth + 1) > BFbound),
+	  check_error(!(static_cast<unsigned>(next->depth = node->depth + 1) > BFbound),
 		      "Dijkstra propagation in inconsistent network",
 		      TempNetErr::TempNetInternalError());
 	  next->reftime = newDistance;
 	  // Appropriate priority key as derived from Johnson's algorithm
-	  queue->insertInQueue (next, newDistance - next->potential);
+	  queue.insertInQueue (next, newDistance - next->potential);
 
 	  // Store in set of updated timepoints
 	  handleNodeUpdate(next);
@@ -893,30 +897,30 @@ namespace EUROPA {
   Void TemporalNetwork::incDijkstraRefBack()
   {
     // PHM New function to support reftime calculations
-    BucketQueue* queue = this->bqueue;
-#ifndef EUROPA_FAST
-    int BFbound = this->nodes.size();
-#endif
+    BucketQueue& queue = *(this->bqueue);
+
+    check_error_variable(unsigned long BFbound = this->nodes.size());
+
     while (true) {
-      DnodeId dnode =  queue->popMinFromQueue();
-      if(dnode.isNoId())
+      DnodeId dnode =  queue.popMinFromQueue();
+      if(dnode == NULL)
 	return;
-      TimepointId node(dnode);
+      TimepointId node = boost::dynamic_pointer_cast<Timepoint>(dnode);
       for (int i=0; i< node->inCount; i++) {
 	DedgeId edge = node->inArray[i];
-	TimepointId next = (TimepointId) edge->from;
+	TimepointId next = boost::dynamic_pointer_cast<Timepoint>(edge->from);
 	Time newDistance = -(node->reftime) + edge->length;
 	if (newDistance < -(next->reftime)) {
     check_error(!(newDistance > MAX_DISTANCE || newDistance < MIN_DISTANCE),
                 "Potential over(under)flow during lower bound propagation",
                 TempNetErr::TimeOutOfBoundsError());
 	  // Next check is a failsafe to prevent infinite propagation.
-    check_error(!((next->depth = node->depth + 1) > BFbound),
+    check_error(!(static_cast<unsigned>(next->depth = node->depth + 1) > BFbound),
                 "Dijkstra propagation in inconsistent network",
                 TempNetErr::TempNetInternalError());
 	  next->reftime = -newDistance;
 	  // For backward prop correct key = (distance + potential).
-	  queue->insertInQueue (next, newDistance + next->potential);
+	  queue.insertInQueue (next, newDistance + next->potential);
 
 	  // Store in set of updated timepoints
 	  handleNodeUpdate(next);
@@ -928,12 +932,11 @@ namespace EUROPA {
 
   TimepointId TemporalNetwork::getRingLeader(TimepointId tpId)
   {
-    check_error(tpId.isValid(),
+    check_error(tpId,
                 "TemporalNetwork:: accessing invalid timepoint.",
                 TempNetErr::TempNetInvalidTimepointError());
-    Tnode* tpt = tpId.operator->();
-    TimepointId ringLeader = tpt->ringLeader;
-    if (ringLeader.isNoId())
+    TimepointId ringLeader = tpId->ringLeader;
+    if (ringLeader == NULL)
       return tpId;   // Trivial TEQ, timepoint is own leader.
     else
       return ringLeader;
@@ -941,12 +944,11 @@ namespace EUROPA {
 
   std::list<TimepointId> TemporalNetwork::getRingFollowers (TimepointId tpId)
   {
-    check_error(tpId.isValid(),
+    check_error(tpId,
                 "TemporalNetwork:: accessing invalid timepoint.",
                 TempNetErr::TempNetInvalidTimepointError());
-    Tnode* tpt = tpId.operator->();
-    TimepointId ringLeader = tpt->ringLeader;
-    if (ringLeader.isNoId())
+    TimepointId ringLeader = tpId->ringLeader;
+    if (ringLeader == NULL)
       return std::list<TimepointId>();   // Trivial TEQ, no followers.
     else
       return ringLeader->ringFollowers;
@@ -954,13 +956,12 @@ namespace EUROPA {
 
   std::list<TimepointId> TemporalNetwork::getRingPredecessors (TimepointId tpId)
   {
-    check_error(tpId.isValid(),
+    check_error(tpId,
                 "TemporalNetwork:: accessing invalid timepoint.",
                 TempNetErr::TempNetInvalidTimepointError());
-    Tnode* tpoint = tpId.operator->();
-    Tnode* tpt = (Tnode*) tpoint->ringLeader;
-    if (tpt == 0)
-      tpt = tpoint;   // Trivial TEQ, timepoint is own leader.
+    TimepointId tpt = boost::dynamic_pointer_cast<Timepoint>(tpId->ringLeader);
+    if (!tpt)
+      tpt = tpId;   // Trivial TEQ, timepoint is own leader.
 
     // Predecessors are computed dynamically.
     // Might be possible to cache these too.
@@ -968,11 +969,11 @@ namespace EUROPA {
     std::list<TimepointId> ans;
     int numedges = tpt->outCount;
     for (int i=0; i<numedges; i++) {
-      Dedge* e = (Dedge*) tpt->outArray[i];
+      DedgeId e = tpt->outArray[i];
       Time length = e->length;
-      Tnode* next = (Tnode*) e->to;
+      TimepointId next = boost::dynamic_pointer_cast<Tnode>(e->to);
       if (length < 0)   // Negative predecessors are enabling.
-	ans.push_back (next->getId());
+	ans.push_back(next);
 
       else if (length == 0) {
 	// [0,<pos>] predecessors were requested to be also enabling.
@@ -990,8 +991,8 @@ namespace EUROPA {
 	// and after A has been executed, propagation ensures C does not
 	// precede B.
 
-	if (next->ringLeader != tpt->getId())
-	  ans.push_back (next->getId());
+	if (next->ringLeader != tpt)
+	  ans.push_back (TimepointId(next));
       }
     }
     return ans;
@@ -1004,18 +1005,18 @@ namespace EUROPA {
     // when adding or (1/31/2001) narrowing constraint.
     if (lb == 0 && ub == 0) {
       // First make sure at least one tp has a ringLeader,
-      if (targ->ringLeader.isNoId() && src->ringLeader.isNoId())
+      if (targ->ringLeader == NULL && src->ringLeader == NULL)
 	src->ringLeader = src;
       // Now place any leaderless tp under the other's leader.
-      if (targ->ringLeader.isNoId()) {
+      if (targ->ringLeader == NULL) {
 	// In this case src->ringLeader must be non-null
 	targ->ringLeader = src->ringLeader;
-	src->ringLeader->ringFollowers.push_back(targ->getId());
+	src->ringLeader->ringFollowers.push_back(targ);
       }
-      if (src->ringLeader.isNoId()) {
+      if (src->ringLeader) {
 	// In this case targ->ringLeader must be non-null
 	src->ringLeader = targ->ringLeader;
-	targ->ringLeader->ringFollowers.push_back(src->getId());
+	targ->ringLeader->ringFollowers.push_back(src);
       }
       // Do nothing in case where both RingLeaders are non-null;
       // merging two TEQs is beyond the scope of this mechanism.
@@ -1034,13 +1035,13 @@ namespace EUROPA {
     if (tpt->ringLeader == tpt) {
       // It's a leader
       for(std::list<TimepointId>::const_iterator it = tpt->ringFollowers.begin(); it != tpt->ringFollowers.end(); ++it)
-	((*it).operator->())->ringLeader = TimepointId::noId();
+	(*it)->ringLeader.reset();
     }
-    else if (!tpt->ringLeader.isNoId()) // It's a follower
+    else if (tpt->ringLeader != NULL) // It's a follower
       tpt->ringLeader->ringFollowers.remove(tpt);
   }
 
-  const TemporalNetworkId& TemporalNetwork::getId() const {
+  const TemporalNetworkId TemporalNetwork::getId() const {
     return m_id;
   }
 
@@ -1048,9 +1049,9 @@ namespace EUROPA {
     return m_updatedTimepoints;
   }
 
-  void TemporalNetwork::handleNodeUpdate(const DnodeId& node){
-    checkError(TimepointId::convertable(node), node);
-    TimepointId tnode = node;
+  void TemporalNetwork::handleNodeUpdate(const DnodeId node){
+    const TimepointId tnode = boost::dynamic_pointer_cast<Timepoint>(node);
+    checkError(tnode, node);
     if(node != getOrigin())
       m_updatedTimepoints.insert(tnode);
   }
@@ -1064,10 +1065,10 @@ namespace EUROPA {
     this->consistent = c;
   }
 
-  Tnode::Tnode(TemporalNetwork* t) :  Dnode(), m_deletionMarker(true) , owner(t){
-    lowerBound = NEG_INFINITY;
-    upperBound = POS_INFINITY;
-  }
+Tnode::Tnode(TemporalNetwork* t) :
+    Dnode(), lowerBound(NEG_INFINITY), upperBound(POS_INFINITY), reftime(0),
+    prev_reftime(0), ordinal(0), m_baseDomainConstraint(), m_deletionMarker(true),
+    index(0), ringLeader(), ringFollowers(), owner(t) {}
 
   Tnode::~Tnode(){
     discard(false);
@@ -1080,17 +1081,12 @@ namespace EUROPA {
     Dnode::handleDiscard();
   }
 
-  const TemporalConstraintId& Tnode::getBaseDomainConstraint() const { return m_baseDomainConstraint;}
+  const TemporalConstraintId Tnode::getBaseDomainConstraint() const { return m_baseDomainConstraint;}
 
-  void Tnode::setBaseDomainConstraint(const TemporalConstraintId& constraint) {m_baseDomainConstraint = constraint;}
-
-  const TemporalConstraintId& Tspec::getId() const {
-    return m_id;
-  }
+  void Tnode::setBaseDomainConstraint(const TemporalConstraintId constraint) {m_baseDomainConstraint = constraint;}
 
   Tspec::~Tspec() {
     discard(false);
-    m_id.remove();
   }
 
   void Tspec::handleDiscard(){

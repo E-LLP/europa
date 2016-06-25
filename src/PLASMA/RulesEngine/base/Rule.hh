@@ -1,5 +1,5 @@
-#ifndef _H_Rule
-#define _H_Rule
+#ifndef H_Rule
+#define H_Rule
 
 
 /**
@@ -11,7 +11,6 @@
  */
 
 #include "RulesEngineDefs.hh"
-#include "LabelStr.hh"
 #include "Engine.hh"
 #include <vector>
 #include <map>
@@ -31,17 +30,17 @@ namespace EUROPA {
       /**
        * @brief Accessor
        */
-      const RuleSchemaId& getId() const;
+      const RuleSchemaId getId() const;
 
-      void registerRule(const RuleId& rule);
+      void registerRule(const RuleId rule);
 
       /**
        * @brief Retrieve all registered rules for the given predicate. This will include rules
        * defined in ancestors of the current predicate also.
        */
-      void getRules(const PlanDatabaseId& pdb, const LabelStr& predicate, std::vector<RuleId>& results);
+      void getRules(const PlanDatabaseId pdb, const std::string& predicate, std::vector<RuleId>& results);
 
-      const std::multimap<edouble, RuleId>& getRules();
+    const std::multimap<std::string, RuleId>& getRules();
 
       /**
        * @brief Delete all rules stored.
@@ -50,7 +49,7 @@ namespace EUROPA {
 
     protected:
       RuleSchemaId m_id; /*!< Id for reference */
-      std::multimap<edouble, RuleId> m_rulesByName;
+    std::multimap<std::string, RuleId> m_rulesByName;
   };
 
   /**
@@ -66,18 +65,18 @@ namespace EUROPA {
       /**
        * @brief Accessor
        */
-      const RuleId& getId() const;
+      const RuleId getId() const;
 
       /**
        * @brief Accessor
        * @return The predicate for which this rule applies.
        */
-      const LabelStr& getName() const;
+      const std::string& getName() const;
 
-      const LabelStr& getSource() const;
+      const std::string& getSource() const;
 
-      virtual RuleInstanceId createInstance(const TokenId& token,
-                                            const PlanDatabaseId& planDb,
+      virtual RuleInstanceId createInstance(const TokenId token,
+                                            const PlanDatabaseId planDb,
                                             const RulesEngineId &rulesEngine) const = 0;
 
       virtual std::string toString() const;
@@ -87,12 +86,12 @@ namespace EUROPA {
        * @brief Constructor.
        * @param name A unique name for the rule.
        */
-      Rule(const LabelStr& name);
-      Rule(const LabelStr& name, const LabelStr &src);
+      Rule(const std::string& name);
+      Rule(const std::string& name, const std::string &src);
 
       RuleId m_id; /*!< Id for reference */
-      const LabelStr m_name; /*! Unique name for the rule */
-      const LabelStr m_source;
+      const std::string m_name; /*! Unique name for the rule */
+      const std::string m_source;
   };
 }
 

@@ -1,5 +1,5 @@
-#ifndef _H_DbClientTransactionPlayer
-#define _H_DbClientTransactionPlayer
+#ifndef H_DbClientTransactionPlayer
+#define H_DbClientTransactionPlayer
 
 #include "PlanDatabaseDefs.hh"
 #include <iostream>
@@ -33,7 +33,7 @@ namespace EUROPA {
      * @brief Play all transactions from a given TransactionLog
      * @param txLog the source log which has all transactions in memory
      */
-    void play(const DbClientTransactionLogId& txLog);
+    void play(const DbClientTransactionLogId txLog);
 
     /**
      * @brief Play the inverses of transactions from an input stream.
@@ -48,14 +48,17 @@ namespace EUROPA {
      * @param txLog The source log which has all transactions in memory.
      * @param breakpoint If true, stop at the first "breakpoint" transaction
      */
-    void rewind(const DbClientTransactionLogId& txLog, bool breakpoint = false);
+    void rewind(const DbClientTransactionLogId txLog, bool breakpoint = false);
 
     void setFilter(const std::set<std::string>& filters);
     static const std::set<std::string>& MODEL_TRANSACTIONS();
     static const std::set<std::string>& STATE_TRANSACTIONS();
     static const std::set<std::string>& NO_TRANSACTIONS();
 
-    static const char* getObjectAndType(const SchemaId& schema, const DbClientId& client, const char* predicate,ObjectId& object);
+    static std::string getObjectAndType(const SchemaId schema,
+                                        const DbClientId client,
+                                        const std::string& predicate,
+                                        ObjectId& object);
 
   protected:
     typedef std::multimap<std::pair<ConstrainedVariableId, ConstrainedVariableId>, ConstraintId> TemporalRelations;
@@ -115,18 +118,18 @@ namespace EUROPA {
     void playUninvokeTransaction(const TiXmlElement& element, Iterator start, Iterator end);
     void playTemporalRelationCreated(const TiXmlElement& element);
     void playTemporalRelationDeleted(const TiXmlElement& element);
-    TemporalRelations::iterator getTemporalConstraint(const ConstrainedVariableId& fvar,
-						      const ConstrainedVariableId& svar,
+    TemporalRelations::iterator getTemporalConstraint(const ConstrainedVariableId fvar,
+						      const ConstrainedVariableId svar,
 						      const std::string& name);
     void deleteTemporalConstraint(TemporalRelations::iterator it);
-    void removeTemporalConstraint(const ConstrainedVariableId& fvar,
-				  const ConstrainedVariableId& svar,
+    void removeTemporalConstraint(const ConstrainedVariableId fvar,
+				  const ConstrainedVariableId svar,
 				  const std::string& name);
     void getElementsFromConstrain(const TiXmlElement& elem, ObjectId& obj, TokenId& pred,
 				  TokenId& succ);
 
-    const CESchemaId& getCESchema() const;
-    const SchemaId& getSchema() const;
+    CESchemaId getCESchema() const;
+    SchemaId getSchema() const;
 
     DbClientId m_client;
     int m_objectCount;
@@ -207,4 +210,4 @@ namespace EUROPA {
   };
 }
 
-#endif // _H_DbClientTransactionPlayer
+#endif // H_DbClientTransactionPlayer

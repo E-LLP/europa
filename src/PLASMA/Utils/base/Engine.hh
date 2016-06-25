@@ -1,49 +1,50 @@
-#ifndef _H_ENGINE
-#define _H_ENGINE
+#ifndef H_ENGINE
+#define H_ENGINE
 
-#include <istream>
+#include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
 #include "Id.hh"
-#include "tinyxml.h"
 
 namespace EUROPA {
+class TiXmlNode;
 
-  class Engine;
-  typedef Id<Engine> EngineId;
-
-  class EngineComponent;
-  typedef Id<EngineComponent> EngineComponentId;
-
-  class Module;
-  typedef Id<Module> ModuleId;
-
-  class LanguageInterpreter
-  {
-    public:
-      virtual ~LanguageInterpreter() {}
-      virtual std::string interpret(std::istream& input, const std::string& source) = 0;
-
-      void setEngine(EngineId& engine);
-      EngineId& getEngine();
-
-    protected:
-      EngineId m_engine;
-  };
+class Engine;
+typedef Id<Engine> EngineId;
+  
+class EngineComponent;
+typedef Id<EngineComponent> EngineComponentId;
+  
+class Module;
+typedef Id<Module> ModuleId;
+  
+class LanguageInterpreter
+{
+ public:
+  LanguageInterpreter() : m_engine() {}
+  virtual ~LanguageInterpreter() {}
+  virtual std::string interpret(std::istream& input, const std::string& source) = 0;
+  
+  void setEngine(EngineId engine);
+  EngineId getEngine();
+  
+ protected:
+  EngineId m_engine;
+};
 
   class EngineComponent
   {
-    public :
-	  virtual ~EngineComponent() {}
-
-	  void setEngine(EngineId& engine);
-	  EngineId& getEngine();
-
-    protected:
-  	  EngineComponent() {}
-
-  	  EngineId m_engine;
+  public :
+    virtual ~EngineComponent() {}
+    
+    void setEngine(EngineId engine);
+    EngineId getEngine();
+    
+  protected:
+    EngineComponent() : m_engine() {}
+    
+    EngineId m_engine;
   };
 
   class EngineConfig
@@ -67,13 +68,13 @@ namespace EUROPA {
     public :
 	  virtual ~Engine() { m_id.remove(); }
 
-	  EngineId& getId() { return m_id; }
+	  EngineId getId() { return m_id; }
 
 	  virtual void addComponent(const std::string& name,EngineComponent* component) = 0;
       virtual EngineComponent* removeComponent(const std::string& name) = 0;
       virtual EngineComponent* getComponent(const std::string& name) = 0;
       virtual const EngineComponent* getComponent(const std::string& name) const = 0;
-      virtual const std::map<edouble, EngineComponent*>& getComponents() = 0;
+    virtual std::map<std::string, EngineComponent*>& getComponents() = 0;
 
       /** Returns an old interpreter, if any */
       virtual LanguageInterpreter* addLanguageInterpreter(const std::string& language, LanguageInterpreter* interpreter) = 0;
@@ -101,7 +102,7 @@ namespace EUROPA {
         virtual void addModule(ModuleId module);
         virtual void loadModule(const std::string& moduleFileName);
         virtual void removeModule(ModuleId module);
-        virtual ModuleId& getModule(const std::string& moduleName);
+        virtual ModuleId getModule(const std::string& moduleName);
         // TODO: add these
         //virtual void removeModule(const std::string& moduleName);
         //virtual void unloadModule(const std::string& moduleName);
@@ -111,7 +112,7 @@ namespace EUROPA {
         virtual EngineComponent* removeComponent(const std::string& name);
         virtual EngineComponent* getComponent(const std::string& name);
         virtual const EngineComponent* getComponent(const std::string& name) const;
-        virtual std::map<edouble, EngineComponent*>& getComponents();
+    virtual std::map<std::string, EngineComponent*>& getComponents();
 
         virtual std::string executeScript(const std::string& language, const std::string& script, bool isFile);
         /** Returns an old interpreter, if any */
@@ -119,7 +120,7 @@ namespace EUROPA {
         /** Returns the removed interpreter, if any */
         virtual LanguageInterpreter* removeLanguageInterpreter(const std::string& language);
         virtual LanguageInterpreter* getLanguageInterpreter(const std::string& language);
-        virtual std::map<edouble, LanguageInterpreter*>& getLanguageInterpreters();
+    virtual std::map<std::string, LanguageInterpreter*>& getLanguageInterpreters();
 
         virtual EngineConfig* getConfig() { return m_config; }
 
@@ -140,11 +141,13 @@ namespace EUROPA {
         // TODO: use Ids for languages and components
         EngineConfig* m_config;
         std::vector<ModuleId> m_modules;
-        std::map<edouble, LanguageInterpreter*> m_languageInterpreters;          
-        std::map<edouble, EngineComponent*> m_components;          
+    std::map<std::string, LanguageInterpreter*> m_languageInterpreters;          
+    std::map<std::string, EngineComponent*> m_components;          
         
     private:
-        bool m_started;
+    EngineBase(const EngineBase& other);
+    EngineBase& operator=(const EngineBase& other);
+    bool m_started;
   };
 
 } // End namespace

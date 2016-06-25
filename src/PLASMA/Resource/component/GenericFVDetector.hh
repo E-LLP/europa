@@ -1,5 +1,5 @@
-#ifndef _H_GenericFVDetector
-#define _H_GenericFVDetector
+#ifndef H_GenericFVDetector
+#define H_GenericFVDetector
 
 #include "FVDetector.hh"
 #include "Instant.hh"
@@ -50,34 +50,36 @@ namespace EUROPA {
       void handleResourceFlaws(const InstantId inst);
       virtual void handleResourceLevelFlaws(const InstantId inst);
 
-      virtual void getLimitBounds(const InstantId& inst, edouble& lb, edouble& ub) const;
-      void getDefaultLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const;
+      virtual void getLimitBounds(const InstantId inst, edouble& lb, edouble& ub) const;
+      void getDefaultLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const;
       // Requires sub-classing to handle open vs. closed world assumption
-      virtual void getFDLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const = 0; // Level Bounds for FlawDetection
-      virtual void getVDLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const = 0; // Level Bounds for ViolationDetection
+      virtual void getFDLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const = 0; // Level Bounds for FlawDetection
+      virtual void getVDLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const = 0; // Level Bounds for ViolationDetection
 
       friend class GenericFVProfile;
     };
 
-    class GenericFVProfile : public PSResourceProfile
-    {
-    public:
-    	GenericFVProfile(GenericFVDetector* fvd, const ProfileId& profile, bool isFDProfile);
-		virtual ~GenericFVProfile() {}
+class GenericFVProfile : public PSResourceProfile {
+private:
+  GenericFVProfile(const GenericFVProfile&);
+  GenericFVProfile& operator=(const GenericFVProfile&);
+ public:
+  GenericFVProfile(GenericFVDetector* fvd, const ProfileId profile, bool isFDProfile);
+  virtual ~GenericFVProfile() {}
 
-		virtual PSList<TimePoint> getTimes();
-		virtual double getLowerBound(TimePoint time);
-		virtual double getUpperBound(TimePoint time);
+  virtual PSList<TimePoint> getTimes();
+  virtual double getLowerBound(TimePoint time);
+  virtual double getUpperBound(TimePoint time);
 
-	protected:
-		GenericFVDetector* m_detector;
-		ProfileId m_profile;
-		bool m_isFDProfile;
-		PSList<TimePoint> m_times;
-		std::map<TimePoint,std::pair<edouble,edouble> > m_bounds;
+ protected:
+  GenericFVDetector* m_detector;
+  ProfileId m_profile;
+  bool m_isFDProfile;
+  PSList<TimePoint> m_times;
+  std::map<TimePoint,std::pair<edouble,edouble> > m_bounds;
 
-		void update();
-    };
+  void update();
+};
 }
 
 #endif

@@ -4,6 +4,7 @@
 #include "Resource.hh"
 #include "PlanDatabase.hh"
 #include "Context.hh"
+#include "tinyxml.h"
 
 #ifdef ABSOLUTE
 #undef ABSOLUTE
@@ -18,14 +19,14 @@ namespace EUROPA {
 
 //     class TimeComparator {
 //     public:
-//       bool operator()(const InstantId& insta, const InstantId& instb) {
+//       bool operator()(const InstantId insta, const InstantId instb) {
 //         return insta->getTime() < instb->getTime();
 //       }
 //     };
 
 //     class FlawMagnitudeComparator {
 //     public:
-//       bool operator()(const InstantId& insta, const InstantId& instb) {
+//       bool operator()(const InstantId insta, const InstantId instb) {
 //         return insta->
 //       }
 //     };
@@ -33,7 +34,8 @@ namespace EUROPA {
 namespace {
 class ThreatIterator : public FlawIterator {
  public:
-  ThreatIterator(ResourceThreatManager& manager) : FlawIterator(manager) {
+  ThreatIterator(ResourceThreatManager& manager) 
+      : FlawIterator(manager), m_flawedInstants(), m_it(m_flawedInstants.end()) {
     const ObjectSet& objs = manager.getPlanDatabase()->getObjects();
     for(ObjectSet::const_iterator it = objs.begin(); it != objs.end(); ++it) {
       ObjectId obj(*it);
@@ -76,7 +78,7 @@ class ThreatIterator : public FlawIterator {
       };
 
       virtual ~InstantComparator() {}
-      virtual bool operator()(const InstantId& a, const InstantId& b) const = 0;
+      virtual bool operator()(const InstantId a, const InstantId b) const = 0;
       virtual std::string toString() const = 0;
       virtual InstantComparator* copy() const = 0;
     };
@@ -88,14 +90,14 @@ class ThreatIterator : public FlawIterator {
       m_cmps.clear();
     }
 
-    DecisionOrder::DecisionOrder(const DecisionOrder& other) {
-      for(std::list<InstantComparator*>::const_iterator it = other.m_cmps.begin(); it != other.m_cmps.end(); ++it) {
-        m_cmps.push_back((*it)->copy());
-      }
-    }
+DecisionOrder::DecisionOrder(const DecisionOrder& other) : m_cmps() {
+  for(std::list<InstantComparator*>::const_iterator it = other.m_cmps.begin(); it != other.m_cmps.end(); ++it) {
+    m_cmps.push_back((*it)->copy());
+  }
+}
 
     //returns true if a is better than b
-    bool DecisionOrder::operator()(const InstantId& a, const InstantId& b, LabelStr& explanation) const {
+    bool DecisionOrder::operator()(const InstantId a, const InstantId b, std::string& explanation) const {
       check_error(!m_cmps.empty());
       check_error(a.isValid() && b.isValid());
       debugMsg("ResourceThreatManager:betterThan", "Comparing instant " << a->getTime() << " on " << a->getProfile()->getResource()->toString() <<
@@ -126,7 +128,7 @@ class ThreatIterator : public FlawIterator {
 
     class EarliestInstantComparator : public InstantComparator {
     public:
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         return a->getTime() < b->getTime();
       }
       std::string toString() const {return "earliest";}
@@ -135,7 +137,7 @@ class ThreatIterator : public FlawIterator {
 
     class LatestInstantComparator : public InstantComparator {
     public:
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         return a->getTime() > b->getTime();
       }
       std::string toString() const {return "latest";}
@@ -145,7 +147,7 @@ class ThreatIterator : public FlawIterator {
     class MostInstantComparator : public InstantComparator {
     public:
       MostInstantComparator(const FlawDirection& dir = ABSOLUTE) : InstantComparator(), m_dir(dir) {}
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         if(m_dir == UPPER) {
           if(a->hasUpperLevelFlaw()) {
             if(b->hasUpperLevelFlaw()) {
@@ -191,7 +193,7 @@ class ThreatIterator : public FlawIterator {
     class LeastInstantComparator : public InstantComparator {
     public:
       LeastInstantComparator(const FlawDirection& dir = ABSOLUTE) : InstantComparator(), m_dir(dir) {}
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         if(m_dir == UPPER) {
           if(a->hasUpperLevelFlaw()) {
             if(b->hasUpperLevelFlaw()) {
@@ -236,7 +238,7 @@ class ThreatIterator : public FlawIterator {
 
     class UpperInstantComparator : public InstantComparator {
     public:
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         return a->hasUpperLevelFlaw() && !b->hasUpperLevelFlaw();
       }
       std::string toString() const {return "upperLevelFlaw";}
@@ -245,7 +247,7 @@ class ThreatIterator : public FlawIterator {
 
     class LowerInstantComparator : public InstantComparator {
     public:
-      bool operator()(const InstantId& a, const InstantId& b) const {
+      bool operator()(const InstantId a, const InstantId b) const {
         return a->hasLowerLevelFlaw() && !b->hasLowerLevelFlaw();
       }
       std::string toString() const {return "lowerLevelFlaw";}
@@ -253,8 +255,10 @@ class ThreatIterator : public FlawIterator {
     };
 
     //at some point, this should take data about ordering choices by earliest/latest, most/least flawed, and most/least transactions
-    ResourceThreatManager::ResourceThreatManager(const TiXmlElement& configData) : FlawManager(configData), m_preferUpper(false), m_preferLower(false) {
-      std::string order = (configData.Attribute("order") == NULL ? "lower,most,earliest" : configData.Attribute("order"));
+ResourceThreatManager::ResourceThreatManager(const TiXmlElement& configData) 
+    : FlawManager(configData), m_preferUpper(false), m_preferLower(false), m_order() {
+  std::string order = (configData.Attribute("order") == NULL ? 
+                       "lower,most,earliest" : configData.Attribute("order"));
       std::string::size_type curPos = 0;
       InstantComparator::FlawDirection dir = InstantComparator::ABSOLUTE;
       while(curPos != std::string::npos) {
@@ -292,12 +296,12 @@ class ThreatIterator : public FlawIterator {
     ResourceThreatManager::~ResourceThreatManager(){}
 
     //re-impelement this to delegate to FlawManager::staticMatch
-    bool ResourceThreatManager::staticMatch(const EntityId& entity) {
+    bool ResourceThreatManager::staticMatch(const EntityId entity) {
       return !InstantId::convertable(entity);
     }
 
     //there may be no dynamic information here
-    bool ResourceThreatManager::dynamicMatch(const EntityId& entity) {
+    bool ResourceThreatManager::dynamicMatch(const EntityId entity) {
       return staticMatch(entity);
     }
 
@@ -305,7 +309,7 @@ class ThreatIterator : public FlawIterator {
     }
 
     //this should use data from the constructor
-    bool ResourceThreatManager::betterThan(const EntityId& a, const EntityId& b, LabelStr& explanation) {
+    bool ResourceThreatManager::betterThan(const EntityId a, const EntityId b, std::string& explanation) {
       check_error(InstantId::convertable(a) && InstantId::convertable(b));
       InstantId instA(a);
       InstantId instB(b);
@@ -313,7 +317,7 @@ class ThreatIterator : public FlawIterator {
       return m_order(a, b, explanation);
     }
 
-    std::string ResourceThreatManager::toString(const EntityId& entity) const {
+    std::string ResourceThreatManager::toString(const EntityId entity) const {
       check_error(InstantId::convertable(entity));
       InstantId inst(entity);
       std::stringstream os;

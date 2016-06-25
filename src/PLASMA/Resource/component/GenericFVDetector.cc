@@ -6,18 +6,19 @@
 
 namespace EUROPA {
 
-    GenericFVDetector::GenericFVDetector(const ResourceId res) : FVDetector(res) {
-      m_maxInstConsumption = res->getMaxInstConsumption();
-      m_maxInstProduction = res->getMaxInstProduction();
-      m_maxCumulativeConsumption = res->getMaxConsumption();
-      m_maxCumulativeProduction = res->getMaxProduction();
-      debugMsg("GenericFVDetector:GenericFVDetector", "Created FVDetector for " << res->toString());
-      debugMsg("GenericFVDetector:GenericFVDetector", "Got values: "
-    		  << " max instantaneous consumption(" << m_maxInstConsumption << ")"
-    		  << " max instantaneous production(" << m_maxInstProduction << ")"
-    		  << " max consumption(" << m_maxCumulativeConsumption << ")"
-    		  << " max production(" << m_maxCumulativeProduction << ")");
-    }
+GenericFVDetector::GenericFVDetector(const ResourceId res) 
+    : FVDetector(res),
+      m_maxInstConsumption(res->getMaxInstConsumption()),
+      m_maxInstProduction(res->getMaxInstProduction()),
+      m_maxCumulativeConsumption(res->getMaxConsumption()),
+      m_maxCumulativeProduction(res->getMaxProduction()) {
+  debugMsg("GenericFVDetector:GenericFVDetector", "Created FVDetector for " << res->toString());
+  debugMsg("GenericFVDetector:GenericFVDetector", "Got values: "
+           << " max instantaneous consumption(" << m_maxInstConsumption << ")"
+           << " max instantaneous production(" << m_maxInstProduction << ")"
+           << " max consumption(" << m_maxCumulativeConsumption << ")"
+           << " max production(" << m_maxCumulativeProduction << ")");
+}
 
     Resource::ProblemType GenericFVDetector::getResourceViolation(const InstantId inst) const
     {
@@ -199,7 +200,7 @@ namespace EUROPA {
     	}
     }
 
-    void GenericFVDetector::getLimitBounds(const InstantId& inst, edouble& lb, edouble& ub) const
+    void GenericFVDetector::getLimitBounds(const InstantId inst, edouble& lb, edouble& ub) const
     {
     	// TODO: make 1 call instead of 2?
     	lb = m_res->getLowerLimit(inst);
@@ -207,7 +208,7 @@ namespace EUROPA {
     }
 
     // TODO: Level(t) = Capacity(t) - Usage(t)
-    void GenericFVDetector::getDefaultLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const
+    void GenericFVDetector::getDefaultLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const
     {
     	const std::pair<edouble,edouble>& capacityBounds = m_res->getCapacityProfile()->getValue(inst->getTime());
 
@@ -220,16 +221,18 @@ namespace EUROPA {
     	ub = capacityBounds.second + usageUb;
 
     	debugMsg("GenericFVDetector:getDeafultLevelBounds",
-    		m_res->getName().toString() << " - time:" << inst->getTime() << " "
+    		m_res->getName() << " - time:" << inst->getTime() << " "
     		<< "Capacity[" << capacityBounds.first << "," << capacityBounds.second << "] "
     		<< "Usage[" << usageLb << "," << usageUb << "] "
     		<< "Level[" << lb << "," << ub << "]");
     }
 
-    GenericFVProfile::GenericFVProfile(GenericFVDetector* fvd, const ProfileId& profile, bool isFDProfile)
+    GenericFVProfile::GenericFVProfile(GenericFVDetector* fvd, const ProfileId profile, bool isFDProfile)
     	: m_detector(fvd)
     	, m_profile(profile)
     	, m_isFDProfile(isFDProfile)
+        , m_times()
+        , m_bounds()
     {
     	update();
     }

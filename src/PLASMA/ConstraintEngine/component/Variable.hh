@@ -1,5 +1,5 @@
-#ifndef _H_AbstractVar
-#define _H_AbstractVar
+#ifndef H_AbstractVar
+#define H_AbstractVar
 
 #include "Domain.hh"
 #include "ConstrainedVariable.hh"
@@ -32,13 +32,13 @@ namespace EUROPA {
      * @param parent owner if appropriate.
      * @param index position in parent collection.
      */
-    Variable(const ConstraintEngineId& constraintEngine,
+    Variable(const ConstraintEngineId constraintEngine,
              const Domain& baseDomain,
              const bool internal = false,
              bool canBeSpecified = true,
-             const LabelStr& name = ConstrainedVariable::NO_NAME(),
-             const EntityId& parent = EntityId::noId(),
-             int index = ConstrainedVariable::NO_INDEX);
+             const std::string& name = ConstrainedVariable::NO_NAME(),
+             const EntityId parent = EntityId::noId(),
+             unsigned long index = ConstrainedVariable::NO_INDEX);
 
     /**
      * Destructor.
@@ -89,7 +89,8 @@ namespace EUROPA {
     virtual void handleRestrictBaseDomain(const Domain& baseDomain);
 
   private:
-    Variable(const Variable&); // Prohibit compiler from generating copy constructor
+    Variable(const Variable<DomainType>&); // Prohibit compiler from generating copy constructor
+    Variable<DomainType>& operator=(const Variable<DomainType>&);
 
     /**
      * @brief returns the current domain without checking for pending propagation first.
@@ -106,19 +107,19 @@ namespace EUROPA {
   };
 
   template<class DomainType>
-  Variable<DomainType>::Variable(const ConstraintEngineId& constraintEngine,
-                                 const Domain& baseDomain,
+  Variable<DomainType>::Variable(const ConstraintEngineId constraintEngine,
+                                 const Domain& _baseDomain,
                                  const bool internal,
-                                 bool canBeSpecified,
-                                 const LabelStr& name,
-                                 const EntityId& parent,
-                                 int index)
-    : ConstrainedVariable(constraintEngine, internal, canBeSpecified, name, parent, index),
-    m_baseDomain(static_cast<DomainType*>(baseDomain.copy())),
-    m_derivedDomain(static_cast<DomainType*>(baseDomain.copy())) {
+                                 bool _canBeSpecified,
+                                 const std::string& name,
+                                 const EntityId _parent,
+                                 unsigned long index)
+    : ConstrainedVariable(constraintEngine, internal, _canBeSpecified, name, _parent, index),
+    m_baseDomain(static_cast<DomainType*>(_baseDomain.copy())),
+    m_derivedDomain(static_cast<DomainType*>(_baseDomain.copy())) {
 
-	debugMsg("Variable:Variable", "Name " << name.toString());
-    debugMsg("Variable:Variable", "Base Domain = " << baseDomain.toString());
+    debugMsg("Variable:Variable", "Name " << name);
+    debugMsg("Variable:Variable", "Base Domain = " << _baseDomain.toString());
 
     // Note that we permit the domain to be empty initially
     m_derivedDomain->setListener(m_listener);

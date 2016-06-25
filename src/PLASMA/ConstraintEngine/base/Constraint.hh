@@ -1,5 +1,5 @@
-#ifndef _H_Constraint
-#define _H_Constraint
+#ifndef H_Constraint
+#define H_Constraint
 
 /**
  * @file Constraint.hh
@@ -13,7 +13,6 @@
 #include "ConstraintEngineDefs.hh"
 #include "PSConstraintEngine.hh"
 #include "DomainListener.hh"
-#include "LabelStr.hh"
 
 #include <vector>
 #include <set>
@@ -58,9 +57,9 @@ namespace EUROPA {
      * @param constraintEngine The constraintEngine instance to wich the constraint belongs. There is exactly one.
      * @param variables The variables that will form the scope of the constraint.
      */
-    Constraint(const LabelStr& name,
-	       const LabelStr& propagatorName,
-	       const ConstraintEngineId& constraintEngine,
+    Constraint(const std::string& name,
+	       const std::string& propagatorName,
+	       const ConstraintEngineId constraintEngine,
 	       const std::vector<ConstrainedVariableId>& variables);
 
     virtual ~Constraint();
@@ -70,29 +69,29 @@ namespace EUROPA {
     /**
      * @brief Accessor
      */
-    const ConstraintId& getId() const;
+    const ConstraintId getId() const;
 
     /**
      * @brief Accessor
      */
-    const LabelStr& getName() const;
+    const std::string& getName() const;
 
     /**
      * @brief Accessor
      */
-    const PropagatorId& getPropagator() const;
+    const PropagatorId getPropagator() const;
 
     /**
      * @brief Accessor
      */
-    const LabelStr& getCreatedBy() const;
+    const std::string& getCreatedBy() const;
 
     /**
      * @brief Test if the given variable is constrained by this constraint.
      * @param variable The variable to test.
      * @return true if var is a member of the constraint scope
      */
-    bool isVariableOf(const ConstrainedVariableId& variable);
+    bool isVariableOf(const ConstrainedVariableId variable);
 
     /**
      * @brief Check if the constraint is to be actively used in propagation.
@@ -134,7 +133,7 @@ namespace EUROPA {
      * @brief Informs the constraint that it is a copy of another constraint. It is up to the receiever
      * to use this information or disregard it.
      */
-    virtual void setSource(const ConstraintId& sourceConstraint) {
+    virtual void setSource(const ConstraintId sourceConstraint) {
       check_error(sourceConstraint.isValid());
     }
 
@@ -147,7 +146,7 @@ namespace EUROPA {
      * @brief Notification from a variable that its base domain has been retricted. May cause the constraint to be
      * deactivated
      */
-    void notifyBaseDomainRestricted(const ConstrainedVariableId& var);
+    void notifyBaseDomainRestricted(const ConstrainedVariableId var);
 
     /**
      * @brief Test the status of redundant flag
@@ -186,7 +185,7 @@ namespace EUROPA {
      * @brief Base implementation will require all variables in scope have the base domains as singletons. Over-ride
      * for weaker criteria which may apply for certain constraints.
      */
-    virtual bool testIsRedundant(const ConstrainedVariableId& var = ConstrainedVariableId::noId()) const;
+    virtual bool testIsRedundant(const ConstrainedVariableId var = ConstrainedVariableId::noId()) const;
 
     friend class ConstraintEngine; /**< Grant access to protected event handler methods handleExecute, and canIgnore */
 
@@ -198,14 +197,16 @@ namespace EUROPA {
      * @param var The variable whose domain is requested.
      * @return A mutable reference to the domain.
      */
-    static Domain& getCurrentDomain(const ConstrainedVariableId& var);
+    static Domain& getCurrentDomain(const ConstrainedVariableId var);
 
     /**
      * @brief Wrapper for handleExecute calls, will set propagation context for all the variables in this constraint
      *
      */
     virtual void execute();
-    virtual void execute(const ConstrainedVariableId& variable,int argIndex,const DomainListener::ChangeType& changeType);
+    virtual void execute(const ConstrainedVariableId variable,
+                         unsigned int argIndex,
+                         const DomainListener::ChangeType& changeType);
 
     /**
      * @brief Called when no specific change event on a variable is reported.
@@ -226,8 +227,8 @@ namespace EUROPA {
      * @param changeType - the nature of the change occuring in the given variable.
      * @see ConstraintEngine::execute(), ConstraintEngine::PENDING, DomainListener::ChangeType
      */
-    virtual void handleExecute(const ConstrainedVariableId& variable,
-			       int argIndex,
+    virtual void handleExecute(const ConstrainedVariableId variable,
+			       unsigned int argIndex,
 			       const DomainListener::ChangeType& changeType);
 
     /**
@@ -242,8 +243,8 @@ namespace EUROPA {
      * @return true if the event cannot impact the consistency of the Constraint given its current state. Othwerwise false.
      * @see ConstraintEngine::notify()
      */
-    virtual bool canIgnore(const ConstrainedVariableId& variable,
-			   int argIndex,
+    virtual bool canIgnore(const ConstrainedVariableId variable,
+			   unsigned int argIndex,
 			   const DomainListener::ChangeType& changeType);
 
 
@@ -256,7 +257,7 @@ namespace EUROPA {
      * @return the vector of variables that this constraint modifies.  Defaults to the scope.
      * @see ConstraintEngine::getScope(), ConstraintEngine::handleRelax()
      */
-    virtual const std::vector<ConstrainedVariableId>& getModifiedVariables(const ConstrainedVariableId& variable) const;
+    virtual const std::vector<ConstrainedVariableId>& getModifiedVariables(const ConstrainedVariableId variable) const;
 
     
     /**
@@ -276,7 +277,6 @@ namespace EUROPA {
 
     /**
      * @brief Allow implementation class to take action in the event of deactivation
-     * @param delegate The constraint which will justify deactivation
      */
     virtual void handleDeactivate(){}
 
@@ -285,10 +285,10 @@ namespace EUROPA {
      */
     virtual void handleDiscard();
 
-    const LabelStr m_name; /**< Name used on stratup to bind to the correct factory and then present as a debugging aid. */
+    const std::string m_name; /**< Name used on stratup to bind to the correct factory and then present as a debugging aid. */
     const ConstraintEngineId m_constraintEngine; /**< The owner ConstraintEngine */
     std::vector<ConstrainedVariableId> m_variables; /**< The variable scope of the Constraint. */
-    LabelStr m_violationExpl; /**< optional explanation string, typically coming from the model */
+    std::string m_violationExpl; /**< optional explanation string, typically coming from the model */
 
   private:
     /**
@@ -296,7 +296,7 @@ namespace EUROPA {
      * relationships.
      * @param propagator The single Propagator in the ConstraintEngine that can accept this constraint.
      */
-    void setPropagator(const PropagatorId& propagator);
+    void setPropagator(const PropagatorId propagator);
 
     bool isValid() const;
 
@@ -305,67 +305,67 @@ namespace EUROPA {
     ConstraintId m_id; /**< Self reference */
     PropagatorId m_propagator; /**< The owner Propagator. */
     bool m_isUnary; /**< True if constructed with a single variable */
-    const LabelStr m_createdBy; /**< Populated on construction. Indicates the user that created the constraint. */
+    const std::string m_createdBy; /**< Populated on construction. Indicates the user that created the constraint. */
     unsigned int m_deactivationRefCount; /*!< Tracks number of outstanding deactivation calls */
     bool m_isRedundant; /*!< True of the constraint is redundant */
   };
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4,
-						const ConstrainedVariableId& arg5);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4,
+						const ConstrainedVariableId arg5);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4,
-						const ConstrainedVariableId& arg5,
-						const ConstrainedVariableId& arg6);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4,
+						const ConstrainedVariableId arg5,
+						const ConstrainedVariableId arg6);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4,
-						const ConstrainedVariableId& arg5,
-						const ConstrainedVariableId& arg6,
-						const ConstrainedVariableId& arg7);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4,
+						const ConstrainedVariableId arg5,
+						const ConstrainedVariableId arg6,
+						const ConstrainedVariableId arg7);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4,
-						const ConstrainedVariableId& arg5,
-						const ConstrainedVariableId& arg6,
-						const ConstrainedVariableId& arg7,
-						const ConstrainedVariableId& arg8);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4,
+						const ConstrainedVariableId arg5,
+						const ConstrainedVariableId arg6,
+						const ConstrainedVariableId arg7,
+						const ConstrainedVariableId arg8);
 
-  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId& arg1,
-						const ConstrainedVariableId& arg2,
-						const ConstrainedVariableId& arg3,
-						const ConstrainedVariableId& arg4,
-						const ConstrainedVariableId& arg5,
-						const ConstrainedVariableId& arg6,
-						const ConstrainedVariableId& arg7,
-						const ConstrainedVariableId& arg8,
-						const ConstrainedVariableId& arg9,
-						const ConstrainedVariableId& arg10,
-						const ConstrainedVariableId& arg11,
-						const ConstrainedVariableId& arg12,
-						const ConstrainedVariableId& arg13);
+  std::vector<ConstrainedVariableId> makeScope(const ConstrainedVariableId arg1,
+						const ConstrainedVariableId arg2,
+						const ConstrainedVariableId arg3,
+						const ConstrainedVariableId arg4,
+						const ConstrainedVariableId arg5,
+						const ConstrainedVariableId arg6,
+						const ConstrainedVariableId arg7,
+						const ConstrainedVariableId arg8,
+						const ConstrainedVariableId arg9,
+						const ConstrainedVariableId arg10,
+						const ConstrainedVariableId arg11,
+						const ConstrainedVariableId arg12,
+						const ConstrainedVariableId arg13);
 }
 #endif

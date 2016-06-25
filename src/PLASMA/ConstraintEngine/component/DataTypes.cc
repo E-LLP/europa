@@ -13,7 +13,7 @@
 
 #define DT_STATIC_MEMBERS(dataType,dtName) \
 const std::string& dataType::NAME() { static std::string sl_name(#dtName); return sl_name; } \
-const DataTypeId& dataType::instance() { static dataType sl_instance; return sl_instance.getId(); }
+const DataTypeId dataType::instance() { static dataType sl_instance; return sl_instance.getId(); }
 
 
 namespace EUROPA
@@ -40,20 +40,20 @@ bool VoidDT::isNumeric() const { return false; }
 bool VoidDT::isBool() const  { return false; }
 bool VoidDT::isString() const  { return false; }
 
-edouble VoidDT::createValue(const std::string& value) const
+edouble VoidDT::createValue(const std::string&) const
 {
   check_error(ALWAYS_FAILS, "can't create void value");
   return -1;
 }
 
 ConstrainedVariableId
-VoidDT::createVariable(const ConstraintEngineId& constraintEngine,
-                                const Domain& baseDomain,
-                                const bool internal,
-                                bool canBeSpecified,
-                                const char* name,
-                                const EntityId& parent,
-                                int index) const
+VoidDT::createVariable(const ConstraintEngineId,
+                                const Domain&,
+                                const bool,
+                                bool,
+                                const std::string&,
+                                const EntityId,
+                                unsigned int) const
 {
     check_error(ALWAYS_FAILS, "can't create void variable");
     return ConstrainedVariableId::noId();
@@ -142,15 +142,15 @@ edouble BoolDT::createValue(const std::string& value) const
   return -1;
 }
 
-std::string  BoolDT::toString(edouble value) const
+std::string BoolDT::toString(edouble value) const
 {
-  static const LabelStr sl_true("true");
-  static const LabelStr sl_false("false");
+  static const std::string sl_true("true");
+  static const std::string sl_false("false");
   checkError(value == true || value == false, value << "is not a bool value" );
   if(value == true)
-    return sl_true.toString();
+    return sl_true;
   else
-    return sl_false.toString();
+    return sl_false;
 }
 
 StringDT::StringDT()
@@ -191,11 +191,12 @@ edouble SymbolDT::createValue(const std::string& value) const
   return LabelStr(value);
 }
 
-RestrictedDT::RestrictedDT(const char* name, const DataTypeId& baseType, const Domain& baseDomain)
+RestrictedDT::RestrictedDT(const std::string& name, const DataTypeId baseType,
+                           const Domain& _baseDomain)
     : DataType(name)
     , m_baseType(baseType)
 {
-    m_baseDomain = baseDomain.copy();
+    m_baseDomain = _baseDomain.copy();
     m_baseDomain->setDataType(getId());
     setIsRestricted(true);
 }

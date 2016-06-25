@@ -1,11 +1,12 @@
 #include "HasAncestorConstraint.hh"
 #include "Object.hh"
+#include "CESchema.hh"
 
 namespace EUROPA{
 
-  HasAncestorConstraint::HasAncestorConstraint(const LabelStr& name,
-						     const LabelStr& propagatorName,
-						     const ConstraintEngineId& constraintEngine,
+  HasAncestorConstraint::HasAncestorConstraint(const std::string& name,
+						     const std::string& propagatorName,
+						     const ConstraintEngineId constraintEngine,
 						     const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_first(static_cast<ObjectDomain&>(getCurrentDomain(variables[0]))),
@@ -23,22 +24,22 @@ namespace EUROPA{
     apply();
   }
 
-  void HasAncestorConstraint::handleExecute(const ConstrainedVariableId& variable,
-					       int argIndex,
-					       const DomainListener::ChangeType& changeType){
-    handleExecute();
-  }
+void HasAncestorConstraint::handleExecute(const ConstrainedVariableId,
+                                          unsigned int,
+                                          const DomainListener::ChangeType&){
+  handleExecute();
+}
 
-  bool HasAncestorConstraint::canIgnore(const ConstrainedVariableId& variable,
-					   int argIndex,
-					   const DomainListener::ChangeType& changeType){
-    check_error(argIndex <= 1);
-
-    if(m_first.isOpen() || m_restrictions.isOpen())
-      return true;
-
-    return (false);
-  }
+bool HasAncestorConstraint::canIgnore(const ConstrainedVariableId,
+                                      unsigned int argIndex,
+                                      const DomainListener::ChangeType&){
+  check_error(argIndex <= 1);
+  
+  if(m_first.isOpen() || m_restrictions.isOpen())
+    return true;
+  
+  return (false);
+}
 
   void HasAncestorConstraint::apply() {
     
@@ -56,7 +57,7 @@ namespace EUROPA{
 
     allAncestors.unique();
     ObjectId object = allAncestors.front();
-    const DataTypeId& dt = m_constraintEngine->getCESchema()->getDataType(object->getRootType().c_str());
+    const DataTypeId dt = m_constraintEngine->getCESchema()->getDataType(object->getRootType().c_str());
     ObjectDomain setOfAncestors(dt,allAncestors);
     // Prune this set for those elements in the set of restrictions imposed
     setOfAncestors.intersect(m_restrictions);
@@ -70,8 +71,8 @@ namespace EUROPA{
       candidate->getAncestors(candidatesAncestors);
       bool removeCandidate = true;
       for(std::list<ObjectId>::const_iterator it1 = candidatesAncestors.begin(); it1 != candidatesAncestors.end(); ++it1){
-	ObjectId object = *it1;
-	if(setOfAncestors.isMember(object)){ // Found common ancestor
+	ObjectId ancestor = *it1;
+	if(setOfAncestors.isMember(ancestor)){ // Found common ancestor
 	  removeCandidate = false;
 	  break;
 	}

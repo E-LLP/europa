@@ -18,7 +18,9 @@ options {
 #include "Debug.hh"
 #include "Domains.hh"
 #include "NddlInterpreter.hh"
+#include "PathDefs.hh"
 
+#include <boost/cast.hpp>
 using namespace EUROPA;
 
 }
@@ -117,7 +119,7 @@ nddl
 
 enumDefinition returns [Expr* result]
 @init {
-    std::vector<std::string> values;
+    std::vector<LabelStr> values;
 }
     :   ^('enum' name=IDENT enumValues[values])
         {
@@ -126,7 +128,7 @@ enumDefinition returns [Expr* result]
         }
     ;
 
-enumValues[std::vector<std::string>& values]
+enumValues[std::vector<LabelStr>& values]
     :       ^('{' (v=IDENT {values.push_back(c_str($v.text->chars));})+ )
     ;
                   
@@ -167,7 +169,7 @@ baseDomain[const DataType* baseType] returns [Domain* result]
         ConstrainedVariableId value = data.getValue();
         if (!baseType->isAssignableFrom(value->getDataType())) {
             reportSemanticError(CTX,
-                "Can't assign "+value->toString()+" to "+baseType->getName().toString());
+                "Can't assign "+value->toString()+" to "+baseType->getName());
         }
        
         result = value->lastDomain().copy(); 
@@ -267,8 +269,8 @@ valueSet returns [Expr* result]
                         !elementType->isAssignableFrom(newElementType)) {
                         reportSemanticError(CTX,
                             "Incompatible types in value set: "+
-                            elementType->toString(values.front())+"("+elementType->getName().toString()+") "+ 
-                            newElementType->toString(v)+"("+newElementType->getName().toString()+")" 
+                            elementType->toString(values.front())+"("+elementType->getName()+") "+ 
+                            newElementType->toString(v)+"("+newElementType->getName()+")" 
                         );
                     }
                 }
@@ -339,8 +341,8 @@ numericInterval returns [Expr* result]
             edouble ub = upper->getSingletonValue();
             Domain* baseDomain;
                     
-            if (lower->getTypeName().toString()=="float" || 
-                upper->getTypeName().toString()=="float") 
+            if (lower->getTypeName()=="float" || 
+                upper->getTypeName()=="float") 
                 baseDomain = new IntervalDomain(lb,ub);
             else 
                 baseDomain = new IntervalIntDomain((eint)lb,(eint)ub);
@@ -528,7 +530,7 @@ constructorArgument[std::vector<std::string>& argNames,std::vector<std::string>&
 		{
 		    const char* varName = c_str($argName.text->chars);
 		    argNames.push_back(varName);
-		    argTypes.push_back(argType->getName().toString());
+		    argTypes.push_back(argType->getName());
 		    CTX->SymbolTable->addLocalVar(varName,argType->getId());
 		}
 	;
@@ -569,7 +571,7 @@ tokenType[ObjectType* objType]
 	:	^(kind=('predicate' | 'action')
 			ttName=IDENT 
 			{ 
-			    tokenTypeName = objType->getName().toString() + "." + c_str($ttName.text->chars);   
+			    tokenTypeName = objType->getName() + "." + c_str($ttName.text->chars);   
 			    tokenType = new InterpretedTokenType(objType->getId(),tokenTypeName,c_str($kind.text->chars));
 			    pushContext(CTX,new NddlTokenSymbolTable(CTX->SymbolTable,tokenType->getId(),objType->getId())); 
 			}
@@ -604,7 +606,7 @@ tokenParameter[InterpretedTokenType* tokenType] returns [Expr* result]
         { 
             const std::vector<Expr*>& vars=child->getChildren();
             for (unsigned int i=0;i<vars.size();i++) {
-                ExprVarDeclaration* vd = dynamic_cast<ExprVarDeclaration*>(vars[i]);
+                ExprVarDeclaration* vd = boost::polymorphic_cast<ExprVarDeclaration*>(vars[i]);
                 tokenType->addArg(vd->getDataType(),vd->getName());
             }
             result = child;            
@@ -810,7 +812,7 @@ predicateInstance returns [PredicateInstanceRef* pi]
 				(ann=tokenAnnotation { annotation = c_str($ann.text->chars); })?
 		)
 	        {
-	            pi = new PredicateInstanceRef(tokenType,tokenStr.c_str(),name,annotation);
+	            pi = new PredicateInstanceRef(tokenType,tokenStr.c_str(),(name == NULL ? "" : name),(annotation == NULL ? "" : annotation));
 	            if (name != NULL)
 	                CTX->SymbolTable->addLocalToken(name,tokenType);
 	        }
@@ -828,7 +830,7 @@ predicateVarRef returns [PredicateInstanceRef* pi]
             if (tokenType.isNoId()) 
                reportSemanticError(CTX,std::string(varName)+" is an undefined token");
 
-            pi = new PredicateInstanceRef(tokenType,NULL,varName,"");
+            pi = new PredicateInstanceRef(tokenType,"",varName,"");
 		}
 	;
 
@@ -1026,7 +1028,7 @@ enforceExpression returns [Expr* result]
                 con = new ExprConstant(dom->getTypeName().c_str(), dom); 
                 args.push_back(value);
                 args.push_back(con);    
-                result = new ExprConstraint("eq", args, NULL);
+                result = new ExprConstraint("eq", args, "");
             } else {
                 result = value;
             }

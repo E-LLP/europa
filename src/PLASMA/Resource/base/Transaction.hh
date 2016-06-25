@@ -1,5 +1,5 @@
-#ifndef _H_Transaction
-#define _H_Transaction
+#ifndef H_Transaction
+#define H_Transaction
 
 /**
  * @file Transaction.hh
@@ -50,12 +50,12 @@ namespace EUROPA {
       TransactionId getId() const {return m_id;}
       std::string toString() const;
 
-      EntityId& getOwner() {return m_owner;}
+      EntityId getOwner() {return m_owner;}
 
     protected:
       TransactionId m_id;
-      ConstrainedVariableId m_time, m_quantity; /*<! The variables for the time and amount of the transaction */
-      bool m_isConsumer; /*<! The flag indicating whether this transaction consumes or produces some amount of resource */
+      ConstrainedVariableId m_time, m_quantity; /**< The variables for the time and amount of the transaction */
+      bool m_isConsumer; /**< The flag indicating whether this transaction consumes or produces some amount of resource */
       EntityId m_owner;
     };
 }

@@ -6,18 +6,20 @@
  */
 #include "Transaction.hh"
 #include "Debug.hh"
+#include "ConstrainedVariable.hh"
+#include "Domain.hh"
 
 namespace EUROPA {
-      Transaction::Transaction(ConstrainedVariableId time, ConstrainedVariableId quantity, bool isConsumer, EntityId owner)
-          : m_id(this)
-          , m_time(time)
-          , m_quantity(quantity)
-          , m_isConsumer(isConsumer)
-          , m_owner(owner)
-      {
-        checkRuntimeError(quantity->lastDomain().getLowerBound() >= 0.0,
-                          "All transactions require positive quantity variables.");
-      }
+Transaction::Transaction(ConstrainedVariableId _time, ConstrainedVariableId _quantity, 
+                         bool _isConsumer, EntityId owner)
+    : m_id(this)
+    , m_time(_time)
+    , m_quantity(_quantity)
+    , m_isConsumer(_isConsumer)
+    , m_owner(owner) {
+  checkRuntimeError(_quantity->lastDomain().getLowerBound() >= 0.0,
+                    "All transactions require positive quantity variables.");
+}
 
       Transaction::~Transaction()
       {

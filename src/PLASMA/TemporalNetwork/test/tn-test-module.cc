@@ -1,5 +1,6 @@
 #include "tn-test-module.hh"
 #include "Utils.hh"
+#include "TestUtils.hh"
 #include "TemporalNetwork.hh"
 #include "TemporalPropagator.hh"
 #include "STNTemporalAdvisor.hh"
@@ -24,10 +25,14 @@
 #include "ModuleRulesEngine.hh"
 #include "ModuleTemporalNetwork.hh"
 
+#include "unused.hh"
+
 #include <algorithm>
 #include <iostream>
 #include <string>
 #include <list>
+
+#include <boost/cast.hpp>
 
 using namespace EUROPA;
 
@@ -45,7 +50,7 @@ TNTestEngine::TNTestEngine()
 {
     createModules();
     doStart();
-    Schema* schema = (Schema*)getComponent("Schema");
+    Schema* schema = boost::polymorphic_cast<Schema*>(getComponent("Schema"));
     schema->addObjectType("Objects");
     schema->addPredicate("Objects.Predicate");
     schema->addPredicate("Objects.PredicateA");
@@ -73,14 +78,14 @@ void TNTestEngine::createModules()
 
 #define DEFAULT_SETUP_CE_ONLY(ce) \
     TNTestEngine tnte; \
-    ConstraintEngine& ce = *((ConstraintEngine*)tnte.getComponent("ConstraintEngine")); ; \
+    ConstraintEngine& ce = *(boost::polymorphic_cast<ConstraintEngine*>(tnte.getComponent("ConstraintEngine"))); \
 
 #define DEFAULT_TEARDOWN_CE_ONLY()
 
 #define CD_DEFAULT_SETUP(ce, db,  autoClose) \
     TNTestEngine tnte; \
-    ConstraintEngine& ce = *((ConstraintEngine*)tnte.getComponent("ConstraintEngine")); ; \
-    PlanDatabase& db = *((PlanDatabase*)tnte.getComponent("PlanDatabase")); \
+    ConstraintEngine& ce = *(boost::polymorphic_cast<ConstraintEngine*>(tnte.getComponent("ConstraintEngine"))); \
+    PlanDatabase& db = *(boost::polymorphic_cast<PlanDatabase*>(tnte.getComponent("PlanDatabase"))); \
     if (autoClose) \
       db.close();
 
@@ -89,9 +94,9 @@ void TNTestEngine::createModules()
 
 #define DEFAULT_SETUP_RULES(ce, db,  autoClose) \
     TNTestEngine tnte; \
-    ConstraintEngine& ce = *((ConstraintEngine*)tnte.getComponent("ConstraintEngine")); ; \
-    RulesEngine& re = *((RulesEngine*)tnte.getComponent("RulesEngine")); \
-    PlanDatabase& db = *((PlanDatabase*)tnte.getComponent("PlanDatabase")); \
+    ConstraintEngine& ce = *(boost::polymorphic_cast<ConstraintEngine*>(tnte.getComponent("ConstraintEngine"))); \
+    RulesEngine& re = *(boost::polymorphic_cast<RulesEngine*>(tnte.getComponent("RulesEngine"))); \
+    PlanDatabase& db = *(boost::polymorphic_cast<PlanDatabase*>(tnte.getComponent("PlanDatabase"))); \
     if (autoClose) \
       db.close();
 
@@ -111,8 +116,8 @@ private:
   static bool testBasicAllocation(){
     TemporalNetwork tn;
     TimepointId origin = tn.getOrigin();
-    Time delta = cast_basis(g_noTime());
-    Time epsilon = cast_basis(g_noTime());
+    Time delta(0);
+    Time epsilon(0);
     tn.getTimepointBounds(origin, delta, epsilon);
     CPPUNIT_ASSERT(delta == 0 && epsilon == 0);
 
@@ -127,8 +132,8 @@ private:
     TimepointId b_start = tn.addTimepoint();
     TimepointId b_end = tn.addTimepoint();
     TimepointId c_start = tn.addTimepoint();
-    TemporalConstraintId a_before_b = tn.addTemporalConstraint(a_end, b_start, 0, cast_basis(g_infiniteTime()));
-    TemporalConstraintId start_before_end = tn.addTemporalConstraint(b_start, b_end, 1, cast_basis(g_infiniteTime()));
+    TemporalConstraintId a_before_b = tn.addTemporalConstraint(a_end, b_start, 0, cast_basis(PLUS_INFINITY));
+    TemporalConstraintId start_before_end = tn.addTemporalConstraint(b_start, b_end, 1, cast_basis(PLUS_INFINITY));
     TemporalConstraintId a_meets_c = tn.addTemporalConstraint(a_end, c_start, 0, 0);
     bool res = tn.propagate();
     CPPUNIT_ASSERT(res);
@@ -162,7 +167,8 @@ private:
     TimepointId y = tn.addTimepoint();
     TimepointId z = tn.addTimepoint();
 
-    TemporalConstraintId fromage = tn.addTemporalConstraint(x, y, (Time)0, cast_basis(g_infiniteTime()));
+    TemporalConstraintId fromage = tn.addTemporalConstraint(x, y, 0,
+                                                            cast_basis(PLUS_INFINITY));
     TemporalConstraintId tango = tn.addTemporalConstraint(y, x, 200, 200);
 
     bool res = tn.propagate();
@@ -174,10 +180,10 @@ private:
     res = tn.propagate();
     CPPUNIT_ASSERT(res); // Consistency restored
 
-    TemporalConstraintId c0 = tn.addTemporalConstraint(y, x, -200, cast_basis(g_infiniteTime()));
-    TemporalConstraintId c1 = tn.addTemporalConstraint(x, z, 0, cast_basis(g_infiniteTime()));
-    TemporalConstraintId c2 = tn.addTemporalConstraint(z, y, (Time)0, cast_basis(g_infiniteTime()));
-    TemporalConstraintId c3 = tn.addTemporalConstraint(x, y, 200, cast_basis(g_infiniteTime()));
+    TemporalConstraintId c0 = tn.addTemporalConstraint(y, x, -200, cast_basis(PLUS_INFINITY));
+    TemporalConstraintId c1 = tn.addTemporalConstraint(x, z, 0, cast_basis(PLUS_INFINITY));
+    TemporalConstraintId c2 = tn.addTemporalConstraint(z, y, 0, cast_basis(PLUS_INFINITY));
+    TemporalConstraintId c3 = tn.addTemporalConstraint(x, y, 200, cast_basis(PLUS_INFINITY));
 
     res = tn.propagate();
     CPPUNIT_ASSERT(res);
@@ -197,13 +203,13 @@ private:
       TemporalNetwork tn;
       TimepointId origin = tn.getOrigin();
 
-      for(int j=0;j<100;j++){
+      for(Time j=0;j<100;j++){
 	TimepointId x = tn.addTimepoint();
 	TimepointId y = tn.addTimepoint();
-	tn.addTemporalConstraint(origin, x, (Time)j, j+1);
-	tn.addTemporalConstraint(x, y, (Time)j, j+1);
-	Time delta = cast_basis(g_noTime());
-	Time epsilon = cast_basis(g_noTime());
+	tn.addTemporalConstraint(origin, x, j, j+1);
+	tn.addTemporalConstraint(x, y, j, j+1);
+	Time delta(0);
+	Time epsilon(0);
 	tn.calcDistanceBounds(x, y, delta, epsilon);
       }
     }
@@ -236,7 +242,7 @@ private:
   }
 
   static bool testTemporalPropagation() {
-    CD_DEFAULT_SETUP(ce,db,false);
+    CD_DEFAULT_SETUP(unused(ce),db,false);
 
     ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
@@ -270,7 +276,7 @@ private:
     temp.push_back(t2.start());
 
 
-    ConstraintId beforeConstraint = db.getConstraintEngine()->createConstraint(LabelStr("precedes"),
+    ConstraintId beforeConstraint = db.getConstraintEngine()->createConstraint("precedes",
                                                                         temp);
     CPPUNIT_ASSERT(!beforeConstraint.isNoId());
 
@@ -283,7 +289,7 @@ private:
     CPPUNIT_ASSERT(t2.end()->getDerivedDomain().getLowerBound() == 6);
     CPPUNIT_ASSERT(t2.end()->getDerivedDomain().getUpperBound() == 20);
 
-    delete (Constraint*) beforeConstraint;
+    delete static_cast<Constraint*>(beforeConstraint);
     TN_DEFAULT_TEARDOWN();
     return true;
   }
@@ -310,13 +316,24 @@ private:
     CPPUNIT_ASSERT(t1.end()->getDerivedDomain().getUpperBound() == 17);
 
     DbClientId client = db.getClient();
-    
+    ce.setAutoPropagation(false);
     client->reset(t1.start());
     client->specify(t1.start(), 0);
     ce.propagate();
 
     client->reset(t1.start());
     client->specify(t1.start(), 5);
+    
+    client->reset(t1.start());
+    ce.propagate();
+    client->specify(t1.start(), 7);
+    ce.propagate();
+    client->reset(t1.start());
+    client->specify(t1.start(), 9);
+    ce.propagate();
+    client->specify(t1.start(), 8);
+    ce.propagate();
+    client->reset(t1.start());
     ce.propagate();
 
     TN_DEFAULT_TEARDOWN();
@@ -326,7 +343,7 @@ private:
   static bool testCanPrecede() {
     CD_DEFAULT_SETUP(ce,db,false);
 
-    ObjectId timeline = (new Timeline(db.getId(), "Objects", LabelStr("o2")))->getId();
+    ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
 
     db.close();
@@ -349,7 +366,7 @@ private:
 
     ce.propagate();
 
-    const TemporalPropagatorId& tp = (TemporalPropagatorId)ce.getPropagatorByName(LabelStr("Temporal"));
+    const TemporalPropagatorId tp = ce.getPropagatorByName("Temporal");
 
     // assert from propagator directly
     CPPUNIT_ASSERT (tp->canPrecede(first.end(), second.start()));
@@ -370,7 +387,7 @@ private:
     temp.push_back(first.end());
     temp.push_back(second.start());
 
-    ConstraintId beforeConstraint = db.getConstraintEngine()->createConstraint(LabelStr("precedes"),
+    ConstraintId beforeConstraint = db.getConstraintEngine()->createConstraint("precedes",
 									temp);
     CPPUNIT_ASSERT(beforeConstraint.isValid());
 
@@ -386,10 +403,9 @@ private:
     CPPUNIT_ASSERT (db.getTemporalAdvisor()->canPrecede(first.getId(),second.getId()));
     CPPUNIT_ASSERT (!db.getTemporalAdvisor()->canPrecede(second.getId(), first.getId()));
 
-    delete (Constraint*) beforeConstraint;
+    delete static_cast<Constraint*>(beforeConstraint);
 
     // restrict via specifying the domain
-
     IntervalIntDomain dom(21, 31);
     first.start()->restrictBaseDomain(dom);
     first.end()->restrictBaseDomain(dom);
@@ -414,7 +430,7 @@ private:
   static bool testCanFitBetween() {
     CD_DEFAULT_SETUP(ce,db,false);
 
-    ObjectId timeline = (new Timeline(db.getId(), "Objects", LabelStr("o2")))->getId();
+    ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
 
     db.close();
@@ -443,10 +459,12 @@ private:
     ce.propagate();
 
     // compute from propagator directly
-    CPPUNIT_ASSERT (((TemporalPropagatorId)ce.getPropagatorByName(LabelStr("Temporal")))->canFitBetween(token.start(), token.end(), predecessor.end(), successor.start()));
+    CPPUNIT_ASSERT((TemporalPropagatorId(ce.getPropagatorByName("Temporal")))->canFitBetween(token.start(), token.end(), predecessor.end(), successor.start()));
 
     // compute from advisor
-    CPPUNIT_ASSERT (db.getTemporalAdvisor()->canFitBetween(token.getId(), predecessor.getId(), successor.getId()));
+    CPPUNIT_ASSERT(db.getTemporalAdvisor()->canFitBetween(token.getId(),
+                                                          predecessor.getId(),
+                                                          successor.getId()));
 
     TN_DEFAULT_TEARDOWN();
     return true;
@@ -455,7 +473,7 @@ private:
   static bool testCanBeConcurrent() {
     CD_DEFAULT_SETUP(ce,db,false);
 
-    ObjectId timeline = (new Timeline(db.getId(), "Objects", LabelStr("o2")))->getId();
+    ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
 
     db.close();
@@ -506,11 +524,11 @@ private:
     t1.end()->reset();
 
 
-    ConstraintId c0 = ce.getId()->createConstraint(LabelStr("precedes"),
+    ConstraintId c0 = ce.getId()->createConstraint("precedes",
 							  makeScope(t0.end(), t1.start()));
 
 
-    ConstraintId c1 = ce.getId()->createConstraint(LabelStr("precedes"),
+    ConstraintId c1 = ce.getId()->createConstraint("precedes",
 							  makeScope(t1.end(), t2.start()));
 
     CPPUNIT_ASSERT(ce.propagate());
@@ -519,8 +537,8 @@ private:
     CPPUNIT_ASSERT(!db.getTemporalAdvisor()->canBeConcurrent(t1.getId(), t2.getId()));
     CPPUNIT_ASSERT(!db.getTemporalAdvisor()->canBeConcurrent(t0.getId(), t2.getId()));
 
-    delete (Constraint*) c0;
-    delete (Constraint*) c1;
+    delete static_cast<Constraint*>(c0);
+    delete static_cast<Constraint*>(c1);
 
     TN_DEFAULT_TEARDOWN();
     return true;
@@ -528,8 +546,8 @@ private:
 
   static bool testTemporalDistance() {
     TNTestEngine tnte;
-    ConstraintEngine& ce = *((ConstraintEngine*)tnte.getComponent("ConstraintEngine")); ;
-    PlanDatabase& db = *((PlanDatabase*)tnte.getComponent("PlanDatabase"));
+    ConstraintEngine& ce = *(boost::polymorphic_cast<ConstraintEngine*>(tnte.getComponent("ConstraintEngine")));
+    PlanDatabase& db = *(boost::polymorphic_cast<PlanDatabase*>(tnte.getComponent("PlanDatabase")));
 
     IntervalIntDomain d1 = IntervalIntDomain(-10, 10);
     IntervalIntDomain d2 = IntervalIntDomain( 20, 30);
@@ -612,7 +630,7 @@ private:
       CPPUNIT_ASSERT(  30 == distance.getUpperBound() );
     }
 
-    IntervalIntDomain d6 = IntervalIntDomain( -g_infiniteTime(), g_infiniteTime() );
+    IntervalIntDomain d6 = IntervalIntDomain( MINUS_INFINITY, PLUS_INFINITY );
     ConstrainedVariableId v6 = (new Variable<IntervalIntDomain> (ce.getId(), d6, false, true, "v6"))->getId();
 
     //            <-10>------------<10>
@@ -623,15 +641,15 @@ private:
     {
       const IntervalIntDomain distance = db.getTemporalAdvisor()->getTemporalDistanceDomain( v1, v7, true );
 
-      CPPUNIT_ASSERT( -g_infiniteTime() == distance.getLowerBound() );
-      CPPUNIT_ASSERT(  g_infiniteTime() == distance.getUpperBound() );
+      CPPUNIT_ASSERT( MINUS_INFINITY == distance.getLowerBound() );
+      CPPUNIT_ASSERT(  PLUS_INFINITY == distance.getUpperBound() );
     }
 
     {
       const IntervalIntDomain distance = db.getTemporalAdvisor()->getTemporalDistanceDomain( v7, v1, true );
 
-      CPPUNIT_ASSERT( -g_infiniteTime() == distance.getLowerBound() );
-      CPPUNIT_ASSERT(  g_infiniteTime() == distance.getUpperBound() );
+      CPPUNIT_ASSERT( MINUS_INFINITY == distance.getLowerBound() );
+      CPPUNIT_ASSERT(  PLUS_INFINITY == distance.getUpperBound() );
     }
 
     //  <-inf>--------------------------------<inf>
@@ -640,17 +658,17 @@ private:
     {
       const IntervalIntDomain distance = db.getTemporalAdvisor()->getTemporalDistanceDomain( v6, v7, true );
 
-      CPPUNIT_ASSERT( -g_infiniteTime() == distance.getLowerBound() );
-      CPPUNIT_ASSERT(  g_infiniteTime() == distance.getUpperBound() );
+      CPPUNIT_ASSERT( MINUS_INFINITY == distance.getLowerBound() );
+      CPPUNIT_ASSERT(  PLUS_INFINITY == distance.getUpperBound() );
     }
 
-    delete (ConstrainedVariable*) v1;
-    delete (ConstrainedVariable*) v2;
-    delete (ConstrainedVariable*) v3;
-    delete (ConstrainedVariable*) v4;
-    delete (ConstrainedVariable*) v5;
-    delete (ConstrainedVariable*) v6;
-    delete (ConstrainedVariable*) v7;
+    delete static_cast<ConstrainedVariable*>(v1);
+    delete static_cast<ConstrainedVariable*>(v2);
+    delete static_cast<ConstrainedVariable*>(v3);
+    delete static_cast<ConstrainedVariable*>(v4);
+    delete static_cast<ConstrainedVariable*>(v5);
+    delete static_cast<ConstrainedVariable*>(v6);
+    delete static_cast<ConstrainedVariable*>(v7);
 
     return true;
   }
@@ -658,7 +676,7 @@ private:
   static bool testTokenStateChangeSynchronization() {
     CD_DEFAULT_SETUP(ce,db,false);
 
-    ObjectId timeline = (new Timeline(db.getId(), "Objects", LabelStr("o2")))->getId();
+    ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
 
     db.close();
@@ -686,7 +704,7 @@ private:
 
     // Allocate a constraint on the inactive token, to constrain a timepoint
     Variable<IntervalIntDomain> v0(ce.getId(), IntervalIntDomain());
-    EqualConstraint c0(LabelStr("eq"), LabelStr("Default"), ce.getId() , makeScope(t2.end(), v0.getId()));
+    EqualConstraint c0("eq", "Default", ce.getId() , makeScope(t2.end(), v0.getId()));
 
     // Conduct the merge.
     t2.doMerge(t1.getId());
@@ -717,7 +735,7 @@ private:
   static bool testInconsistencySynchronization() {
     DEFAULT_SETUP_RULES(ce,db,false);
 
-    ObjectId timeline = (new Timeline(db.getId(), "Objects", LabelStr("o2")))->getId();
+    ObjectId timeline = (new Timeline(db.getId(), "Objects", "o2"))->getId();
     CPPUNIT_ASSERT(!timeline.isNoId());
 
     db.close();
@@ -759,7 +777,7 @@ private:
     std::vector<ConstrainedVariableId> scope;
     scope.push_back(slave->end());
     scope.push_back(t1.parameters()[0]);
-    ce.getId()->createConstraint(LabelStr("leq"), scope);
+    ce.getId()->createConstraint("leq", scope);
 
     CPPUNIT_ASSERT (!ce.propagate());
 
@@ -826,14 +844,12 @@ private:
     ConstrainedVariableId v6 = (new Variable<IntervalIntDomain> (ce.getId(), domEnd, false, true, "v6"))->getId();
 
     v2->restrictBaseDomain(IntervalIntDomain(5, 7));
-
     std::vector<ConstrainedVariableId> temp;
     temp.push_back(v1);
     temp.push_back(v2);
     temp.push_back(v3);
     ConstraintId duration1 =
-        ce.getId()->createConstraint(LabelStr("temporalDistance"), temp);
-
+        ce.getId()->createConstraint("temporalDistance", temp);
     CPPUNIT_ASSERT(!duration1.isNoId());
 
     temp.clear();
@@ -841,7 +857,7 @@ private:
     temp.push_back(v5);
     temp.push_back(v6);
     ConstraintId duration2 =
-        ce.getId()->createConstraint(LabelStr("temporalDistance"), temp);
+        ce.getId()->createConstraint("temporalDistance", temp);
 
     CPPUNIT_ASSERT(!duration2.isNoId());
 
@@ -849,7 +865,7 @@ private:
     temp.push_back(v3);
     temp.push_back(v4);
     ConstraintId beforeConstraint =
-        ce.getId()->createConstraint(LabelStr("precedes"), temp);
+        ce.getId()->createConstraint("precedes", temp);
 
     CPPUNIT_ASSERT(!beforeConstraint.isNoId());
 
@@ -862,15 +878,16 @@ private:
     CPPUNIT_ASSERT(v6->derivedDomain().getLowerBound() == 6);
     CPPUNIT_ASSERT(v6->derivedDomain().getUpperBound() == 20);
 
-    delete (Constraint*) beforeConstraint;
-    delete (Constraint*) duration1;
-    delete (Constraint*) duration2;
-    delete (ConstrainedVariable*) v1;
-    delete (ConstrainedVariable*) v2;
-    delete (ConstrainedVariable*) v3;
-    delete (ConstrainedVariable*) v4;
-    delete (ConstrainedVariable*) v5;
-    delete (ConstrainedVariable*) v6;
+
+    delete static_cast<Constraint*>(beforeConstraint);
+    delete static_cast<Constraint*>(duration1);
+    delete static_cast<Constraint*>(duration2);
+    delete static_cast<ConstrainedVariable*>(v1);
+    delete static_cast<ConstrainedVariable*>(v2);
+    delete static_cast<ConstrainedVariable*>(v3);
+    delete static_cast<ConstrainedVariable*>(v4);
+    delete static_cast<ConstrainedVariable*>(v5);
+    delete static_cast<ConstrainedVariable*>(v6);
 
     DEFAULT_TEARDOWN_CE_ONLY();
     return true;
@@ -878,9 +895,9 @@ private:
 
   static bool testTemporalNogood() {
     TNTestEngine tnte;
-    ConstraintEngine& ce = *((ConstraintEngine*)tnte.getComponent("ConstraintEngine"));
-    TemporalPropagator* tp = (TemporalPropagator*)
-        ((Propagator*)ce.getPropagatorByName(LabelStr("Temporal")));
+    ConstraintEngine& ce = *(boost::polymorphic_cast<ConstraintEngine*>(tnte.getComponent("ConstraintEngine")));
+    TemporalPropagator* tp =
+        id_cast<TemporalPropagator>(ce.getPropagatorByName("Temporal"));
 
     IntervalIntDomain domStart = IntervalIntDomain(1,10);
     IntervalIntDomain domEnd = IntervalIntDomain(0,1);
@@ -895,7 +912,7 @@ private:
     temp.push_back(v2);
     temp.push_back(v3);
     ConstraintId constraint =
-        ce.getId()->createConstraint(LabelStr("temporalDistance"),
+        ce.getId()->createConstraint("temporalDistance",
                                           temp);
     bool consistent = ce.propagate();
     std::vector<ConstrainedVariableId> fromvars;
@@ -922,16 +939,17 @@ private:
     CPPUNIT_ASSERT(tovars.at(2)==v1);
     CPPUNIT_ASSERT(lengths.at(2)==-1);
 
-    delete (Constraint*) constraint;
-    delete (ConstrainedVariable*) v1;
-    delete (ConstrainedVariable*) v2;
-    delete (ConstrainedVariable*) v3;
+    delete static_cast<Constraint*>(constraint);
+    delete static_cast<ConstrainedVariable*>(v1);
+    delete static_cast<ConstrainedVariable*>(v2);
+    delete static_cast<ConstrainedVariable*>(v3);
     return true;
   }
 
   static bool testMinPerturbTimes() {
     DEFAULT_SETUP_CE_ONLY(ce);
-    TemporalPropagator* tp = (TemporalPropagator*) (Propagator*) ce.getPropagatorByName(LabelStr("Temporal"));
+    TemporalPropagator* tp =
+        id_cast<TemporalPropagator>(ce.getPropagatorByName("Temporal"));
 
     std::vector<ConstrainedVariableId> scope;
     std::vector<ConstrainedVariableId> timeVars;
@@ -951,7 +969,7 @@ private:
     scope.push_back(infVar1);
     scope.push_back(infDur);
     scope.push_back(infVar2);
-    ConstraintId infConstr1 = ce.createConstraint(LabelStr("temporalDistance"), scope);
+    unused(ConstraintId infConstr1) = ce.createConstraint("temporalDistance", scope);
     ce.propagate();
 
     std::vector<Time> oldRefTimes(2);
@@ -963,6 +981,7 @@ private:
     CPPUNIT_ASSERT(newRefTimes[0] == 20);
     CPPUNIT_ASSERT(newRefTimes[1] == 21);
 
+    delete static_cast<Constraint*>(infConstr1);
     DEFAULT_TEARDOWN_CE_ONLY();
     return true;
   }

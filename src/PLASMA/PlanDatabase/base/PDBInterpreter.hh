@@ -1,7 +1,7 @@
-#ifndef _H_PDBInterpreter
-#define _H_PDBInterpreter
+#ifndef H_PDBInterpreter
+#define H_PDBInterpreter
 
-#include "ConstrainedVariable.hh"
+#include "ConstraintEngineDefs.hh"
 #include "PlanDatabaseDefs.hh"
 #include <map>
 #include <vector>
@@ -15,10 +15,10 @@ namespace EUROPA {
   {
   	public :
   	    DataRef();
-  	    DataRef(const ConstrainedVariableId& v);
+  	    DataRef(const ConstrainedVariableId v);
   	    virtual ~DataRef();
 
-  	    const ConstrainedVariableId& getValue();
+  	    const ConstrainedVariableId getValue();
 
   	    static DataRef null;
 
@@ -26,27 +26,29 @@ namespace EUROPA {
   	    ConstrainedVariableId m_value;
   };
 
-  class EvalContext
-  {
-  	public:
-  	    EvalContext(EvalContext* parent);
-  	    virtual ~EvalContext();
+class EvalContext {
+ public:
+  EvalContext(EvalContext* parent);
+  virtual ~EvalContext();
 
-  	    virtual void addVar(const char* name,const ConstrainedVariableId& v);
-  	    virtual ConstrainedVariableId getVar(const char* name);
+  virtual void addVar(const std::string& name,const ConstrainedVariableId v);
+  virtual ConstrainedVariableId getVar(const std::string& name);
 
-  	    virtual void addToken(const char* name,const TokenId& t);
-  	    virtual TokenId getToken(const char* name);
+  virtual void addToken(const std::string& name,const TokenId t);
+  virtual TokenId getToken(const std::string& name);
 
-  	    virtual void* getElement(const char* name) const { return NULL; }
+  virtual void* getElement(const std::string& name) const;
 
-        virtual std::string toString() const;
+  virtual std::string toString() const;
 
-  	protected:
-  	    EvalContext* m_parent;
-  	    std::map<std::string,ConstrainedVariableId> m_variables;
-  	    std::map<std::string,TokenId> m_tokens;
-  };
+ protected:
+  EvalContext* m_parent;
+  std::map<std::string,ConstrainedVariableId> m_variables;
+  std::map<std::string,TokenId> m_tokens;
+ private:
+  EvalContext(const EvalContext&);
+  EvalContext& operator=(const EvalContext&);
+};
 
   class Expr
   {
@@ -91,4 +93,4 @@ namespace EUROPA {
 
 }
 
-#endif // _H_PDBInterpreter
+#endif // H_PDBInterpreter

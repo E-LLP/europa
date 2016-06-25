@@ -29,8 +29,8 @@ namespace EUROPA {
       /**
        * @brief Constructor. Test signature for DecisionPointFactory
        */
-      OpenConditionDecisionPoint(const DbClientId& client, const TokenId& flawedToken, const TiXmlElement& configData,
-                                 const LabelStr& explanation = "unknown");
+      OpenConditionDecisionPoint(const DbClientId client, const TokenId flawedToken, const TiXmlElement& configData,
+                                 const std::string& explanation = "unknown");
 
       virtual ~OpenConditionDecisionPoint();
 
@@ -48,7 +48,7 @@ namespace EUROPA {
       /**
        * @brief Used to prune entities out which are not inactive tokens
        */
-      static bool test(const EntityId& entity);
+      static bool test(const EntityId entity);
 
       virtual std::string toString() const;
       virtual std::string toShortString() const;
@@ -56,7 +56,7 @@ namespace EUROPA {
       /**
        * @brief Accessor to flawed token
        */
-      const TokenId& getToken() const;
+      const TokenId getToken() const;
 
     protected:
       virtual void handleInitialize();
@@ -68,10 +68,10 @@ namespace EUROPA {
       const TokenId m_flawedToken; /*!< The token to be resolved. */
       std::vector<LabelStr> m_choices; /*!< The sequences list of states to choose. */
       std::vector<TokenId> m_compatibleTokens; /*!< A possibly empty collection of tokens to merge with. */
-      unsigned int m_mergeCount; /*!< The size of m_compatibleTokens */
-      unsigned int m_choiceCount; /*!< The size of m_choices. */
-      unsigned int m_mergeIndex; /*!< The position of the next choice in m_compatibleTokens. */
-      unsigned int m_choiceIndex; /*!< The position of the next choice in m_choices. */
+      unsigned long m_mergeCount; /*!< The size of m_compatibleTokens */
+      unsigned long m_choiceCount; /*!< The size of m_choices. */
+      unsigned long m_mergeIndex; /*!< The position of the next choice in m_compatibleTokens. */
+      unsigned long m_choiceIndex; /*!< The position of the next choice in m_choices. */
 
     };
 
@@ -96,39 +96,41 @@ namespace EUROPA {
 
     class ActionSupportHeuristic;
 
-    class SupportedOCDecisionPoint : public DecisionPoint
-    {
-    public:
-        SupportedOCDecisionPoint(
-        	const DbClientId& client,
-        	const TokenId& flawedToken,
-        	const TiXmlElement& configData,
-        	const LabelStr& explanation = "unknown");
+  class SupportedOCDecisionPoint : public DecisionPoint {
+   public:
+    SupportedOCDecisionPoint(
+        const DbClientId client,
+        const TokenId flawedToken,
+        const TiXmlElement& configData,
+        const std::string& explanation = "unknown");
 
-        virtual ~SupportedOCDecisionPoint();
+    virtual ~SupportedOCDecisionPoint();
 
-        virtual std::string toString() const;
-        virtual std::string toShortString() const;
+    virtual std::string toString() const;
+    virtual std::string toShortString() const;
 
-    protected:
-        virtual void handleInitialize();
-        virtual void handleExecute();
-        virtual void handleUndo();
-        virtual bool hasNext() const;
-        virtual bool canUndo() const;
+   protected:
+    virtual void handleInitialize();
+    virtual void handleExecute();
+    virtual void handleUndo();
+    virtual bool hasNext() const;
+    virtual bool canUndo() const;
 
-        ActionSupportHeuristic* getSupportHeuristic();
+    ActionSupportHeuristic* getSupportHeuristic();
 
-        const TokenId m_flawedToken; /*!< The token to be resolved. */
-        std::vector<OCDecision*> m_choices;
-        unsigned int m_currentChoice;
-        ActionSupportHeuristic* m_heuristic;
-    };
+    const TokenId m_flawedToken; /*!< The token to be resolved. */
+    std::vector<OCDecision*> m_choices;
+    unsigned int m_currentChoice;
+    ActionSupportHeuristic* m_heuristic;
+private:
+    SupportedOCDecisionPoint(const SupportedOCDecisionPoint&);
+    SupportedOCDecisionPoint& operator=(const SupportedOCDecisionPoint&);
+  };
 
     class ChangeTokenState : public OCDecision
     {
     public:
-    	ChangeTokenState(const DbClientId& dbClient, const TokenId& token);
+    	ChangeTokenState(const DbClientId dbClient, const TokenId token);
     	virtual ~ChangeTokenState();
 
     	virtual void undo();
@@ -143,7 +145,7 @@ namespace EUROPA {
     class ActivateToken : public ChangeTokenState
     {
     public:
-    	ActivateToken(const DbClientId& dbClient, const TokenId& token);
+    	ActivateToken(const DbClientId dbClient, const TokenId token);
     	virtual ~ActivateToken();
 
     	virtual void execute();
@@ -154,7 +156,7 @@ namespace EUROPA {
     class MergeToken : public ChangeTokenState
     {
     public:
-    	MergeToken(const DbClientId& dbClient, const TokenId& token, const std::vector<TokenId>& compatibleTokens);
+    	MergeToken(const DbClientId dbClient, const TokenId token, const std::vector<TokenId>& compatibleTokens);
     	virtual ~MergeToken();
 
     	virtual void execute();
@@ -169,7 +171,7 @@ namespace EUROPA {
     class RejectToken : public ChangeTokenState
     {
     public:
-    	RejectToken(const DbClientId& dbClient, const TokenId& token);
+    	RejectToken(const DbClientId dbClient, const TokenId token);
     	virtual ~RejectToken();
 
     	virtual void execute();
@@ -177,27 +179,29 @@ namespace EUROPA {
 
     };
 
-    class SupportToken : public ChangeTokenState
-    {
-    public:
-    	SupportToken(const DbClientId& dbClient, const TokenId& token, ActionSupportHeuristic* heuristic);
-    	virtual ~SupportToken();
+  class SupportToken : public ChangeTokenState {
+   public:
+    SupportToken(const DbClientId dbClient, const TokenId token, ActionSupportHeuristic* heuristic);
+    virtual ~SupportToken();
 
-    	virtual void execute();
-    	virtual void undo();
-    	virtual std::string toString();
+    virtual void execute();
+    virtual void undo();
+    virtual std::string toString();
 
-    protected:
-    	std::vector<std::pair<TokenTypeId,int> > m_choices;
-    	int m_actionIndex;
-    	int m_effectIndex;
-    	TokenId m_action;
-    	TokenId m_targetEffect;
-    	ActionSupportHeuristic* m_heuristic;
-    	bool m_initialized;
+   protected:
+    std::vector<std::pair<TokenTypeId,unsigned long> > m_choices;
+    unsigned long m_actionIndex;
+    unsigned long m_effectIndex;
+    TokenId m_action;
+    TokenId m_targetEffect;
+    ActionSupportHeuristic* m_heuristic;
+    bool m_initialized;
 
-    	void init();
-    };
+    void init();
+private:
+    SupportToken(const SupportToken&);
+    SupportToken& operator=(const SupportToken&);
+  };
 
     typedef std::vector< std::pair<std::string,double> > ParamValues;
 
@@ -205,8 +209,8 @@ namespace EUROPA {
     {
     public:
     	SupportChoice(
-    			const TokenTypeId& target,
-    			const TokenTypeId& actionType,
+    			const TokenTypeId target,
+    			const TokenTypeId actionType,
     			int effectCount,
     			const std::vector< ParamValues >& paramValues = std::vector< ParamValues >());
     	virtual ~SupportChoice();
@@ -223,7 +227,7 @@ namespace EUROPA {
     	virtual ~ActionSupportHeuristic() {};
 
     	virtual void getSupportCandidates(
-    			const TokenTypeId& target,
+    			const TokenTypeId target,
     			std::vector<SupportChoice>& supports) = 0;
     protected:
     	ActionSupportHeuristic() {};

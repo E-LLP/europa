@@ -6,47 +6,47 @@
 
 namespace EUROPA{
 
-  IntervalToken::IntervalToken(const PlanDatabaseId& planDatabase,
-			       const LabelStr& predicateName,
-			       bool rejectable,
-			       bool isFact,
-			       const IntervalIntDomain& startBaseDomain,
-			       const IntervalIntDomain& endBaseDomain,
-			       const IntervalIntDomain& durationBaseDomain,
-			       const LabelStr& objectName,
-			       bool closed)
-    :Token(planDatabase,
+IntervalToken::IntervalToken(const PlanDatabaseId planDatabase,
+                             const std::string& predicateName,
+                             bool rejectable,
+                             bool _isFact,
+                             const IntervalIntDomain& startBaseDomain,
+                             const IntervalIntDomain& endBaseDomain,
+                             const IntervalIntDomain& durationBaseDomain,
+                             const std::string& objectName,
+                             bool closed)
+:Token(planDatabase,
+       predicateName,
+       rejectable,
+       _isFact,
+       durationBaseDomain,
+       objectName,
+       false), m_start(), m_end(){
+  commonInit(startBaseDomain, endBaseDomain, closed);
+}
+
+IntervalToken::IntervalToken(const TokenId _master,
+                             const std::string& _relation,
+                             const std::string& predicateName,
+                             const IntervalIntDomain& startBaseDomain,
+                             const IntervalIntDomain& endBaseDomain,
+                             const IntervalIntDomain& durationBaseDomain,
+                             const std::string& objectName,
+                             bool closed)
+    :Token(_master,
+	   _relation,
 	   predicateName,
-	   rejectable,
-	   isFact,
 	   durationBaseDomain,
 	   objectName,
-	   false){
-    commonInit(startBaseDomain, endBaseDomain, closed);
-  }
+	   false), m_start(), m_end() {
+  commonInit(startBaseDomain, endBaseDomain, closed);
+}
 
-  IntervalToken::IntervalToken(const TokenId& m_master,
-			       const LabelStr& m_relation,
-			       const LabelStr& predicateName,
-			       const IntervalIntDomain& startBaseDomain,
-			       const IntervalIntDomain& endBaseDomain,
-			       const IntervalIntDomain& durationBaseDomain,
-			       const LabelStr& objectName,
-			       bool closed)
-    :Token(m_master,
-	   m_relation,
-	   predicateName,
-	   durationBaseDomain,
-	   objectName,
-	   false){
-    commonInit(startBaseDomain, endBaseDomain, closed);
-  }
-
-  const TempVarId& IntervalToken::start() const{
+  const TempVarId IntervalToken::start() const{
     checkError(m_start.isValid(), m_start);
     return m_start;}
 
-  const TempVarId& IntervalToken::end() const{
+  const TempVarId IntervalToken::end() const{
     checkError(m_end.isValid(), m_end);
     return m_end;
   }
@@ -65,7 +65,7 @@ namespace EUROPA{
 						    startBaseDomain,
 						    false, // TODO: fixme
 						    true,
-						    LabelStr("start")))->getId();
+						    "start"))->getId();
     m_allVariables.push_back(m_start);
 
     m_end = (new TokenVariable<IntervalIntDomain>(m_id,
@@ -74,7 +74,7 @@ namespace EUROPA{
 						  endBaseDomain,
 						  false, // TODO: fixme
 						  true,
-						  LabelStr("end")))->getId();
+						  "end"))->getId();
     m_allVariables.push_back(m_end);
 
     std::vector<ConstrainedVariableId> temp;
@@ -83,7 +83,7 @@ namespace EUROPA{
     temp.push_back(m_end);
 
     ConstraintId temporalRelation =
-        m_planDatabase->getConstraintEngine()->createConstraint(LabelStr("temporalDistance"),temp);
+        m_planDatabase->getConstraintEngine()->createConstraint("temporalDistance",temp);
 
     m_standardConstraints.insert(temporalRelation);
 

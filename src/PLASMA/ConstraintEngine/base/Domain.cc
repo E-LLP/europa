@@ -41,14 +41,15 @@ namespace EUROPA {
     m_id.remove();
   }
 
-  const DomainListenerId& DomainListener::getId() const {
+  const DomainListenerId DomainListener::getId() const {
     return(m_id);
   }
 
-  Domain::Domain(const DataTypeId& dt, bool enumerated, bool closed)
+  Domain::Domain(const DataTypeId dt, bool enumerated, bool closed)
     : m_dataType(dt)
     , m_enumerated(enumerated)
     , m_closed(closed)
+    , m_listener()
   {
   }
 
@@ -56,6 +57,7 @@ namespace EUROPA {
     : m_dataType(org.m_dataType)
     , m_enumerated(org.m_enumerated)
     , m_closed(org.m_closed)
+    , m_listener()
   {
   }
 
@@ -96,7 +98,7 @@ namespace EUROPA {
   bool Domain::isInterval()   const { return(!m_enumerated); }
   bool Domain::isInfinite()   const { return(!isFinite()); }
 
-  void Domain::setListener(const DomainListenerId& listener) {
+  void Domain::setListener(const DomainListenerId listener) {
     check_error(m_listener.isNoId()); // Only set once
     m_listener = listener;
 
@@ -108,7 +110,7 @@ namespace EUROPA {
     }
   }
 
-  const DomainListenerId& Domain::getListener() const {
+  const DomainListenerId Domain::getListener() const {
     return(m_listener);
   }
 
@@ -126,7 +128,7 @@ namespace EUROPA {
   }
 
   void Domain::operator>>(ostream& os) const {
-    os << getTypeName().toString() << (m_closed ? ":CLOSED" : ":OPEN");
+    os << getTypeName() << (m_closed ? ":CLOSED" : ":OPEN");
   }
 
   edouble Domain::translateNumber(edouble number, bool) const {
@@ -144,7 +146,7 @@ namespace EUROPA {
   bool Domain::canBeCompared(const Domain& domx, const Domain& domy) {
     debugMsg("Domain:canBeCompared", "domx.isBool " << domx.isBool() << " domx.isNumeric " << domx.isNumeric() << " domx.isString " << domx.isString() << " domx.isSymbolic " << domx.isSymbolic());
     debugMsg("Domain:canBeCompared", "domy.isBool " << domy.isBool() << " domy.isNumeric " << domy.isNumeric() << " domy.isString " << domy.isString() << " domy.isSymbolic " << domy.isSymbolic());
-    debugMsg("Domain:canBeCompared", "type of domx " << domx.getTypeName().toString() << " type of domy " << domy.getTypeName().toString());
+    debugMsg("Domain:canBeCompared", "type of domx " << domx.getTypeName() << " type of domy " << domy.getTypeName());
     debugMsg("Domain:canBeCompared", domx.toString());
     debugMsg("Domain:canBeCompared", domy.toString());
     bool result = domx.getDataType()->canBeCompared(domy.getDataType());
@@ -172,7 +174,7 @@ namespace EUROPA {
 
   void Domain::assertSafeComparison(const Domain& domA, const Domain& domB){
     check_error(canBeCompared(domA, domB),
-		domA.getTypeName().toString() + " cannot be compared with " + domB.getTypeName().toString());
+		domA.getTypeName() + " cannot be compared with " + domB.getTypeName());
 
   }
 
@@ -183,11 +185,11 @@ namespace EUROPA {
   }
 
 
-  const DataTypeId& Domain::getDataType() const { return m_dataType; }
-  void Domain::setDataType(const DataTypeId& dt) { m_dataType=dt; }
+  const DataTypeId Domain::getDataType() const { return m_dataType; }
+  void Domain::setDataType(const DataTypeId dt) { m_dataType=dt; }
 
   // TODO: all these just delegate to the data type, should be dropped eventually, preserved for now for backwards compatibility
-  const LabelStr& Domain::getTypeName() const { return getDataType()->getName(); }
+const std::string& Domain::getTypeName() const { return getDataType()->getName(); }
   bool Domain::isSymbolic() const { return getDataType()->isSymbolic(); }
   bool Domain::isEntity() const { return getDataType()->isEntity(); }
   bool Domain::isNumeric() const { return getDataType()->isNumeric(); }

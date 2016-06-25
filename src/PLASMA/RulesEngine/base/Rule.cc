@@ -8,10 +8,8 @@
 
 namespace EUROPA {
 
-    RuleSchema::RuleSchema()
-        : m_id(this)
-    {
-    }
+RuleSchema::RuleSchema()
+    : m_id(this), m_rulesByName() {}
 
     RuleSchema::~RuleSchema()
     {
@@ -19,59 +17,50 @@ namespace EUROPA {
         m_id.remove();
     }
 
-    const RuleSchemaId& RuleSchema::getId() const {return m_id;}
+    const RuleSchemaId RuleSchema::getId() const {return m_id;}
 
-    void RuleSchema::registerRule(const RuleId& rule)
-    {
-        m_rulesByName.insert(std::make_pair(rule->getName().getKey(), rule->getId()));      
-    }
+void RuleSchema::registerRule(const RuleId rule) {
+  m_rulesByName.insert(std::make_pair(rule->getName(), rule->getId()));      
+}
 
-    void RuleSchema::getRules(const PlanDatabaseId& pdb, const LabelStr& name, std::vector<RuleId>& results)
-    {
-        const SchemaId& schema = pdb->getSchema();
+void RuleSchema::getRules(const PlanDatabaseId pdb, const std::string& name,
+                          std::vector<RuleId>& results) {
+  const SchemaId schema = pdb->getSchema();
 
-        // If the predicate is defined on the parent class, then
-        // call this function recursively. do it first since predicates for super-classes should be executed first
-        if(schema->hasParent(name))
-            getRules(pdb,schema->getParent(name), results);
+  // If the predicate is defined on the parent class, then
+  // call this function recursively. do it first since predicates for super-classes should be executed first
+  if(schema->hasParent(name))
+    getRules(pdb,schema->getParent(name), results);
 
-        std::multimap<edouble, RuleId>::const_iterator it = m_rulesByName.find(name.getKey());
-        while(it != m_rulesByName.end()){
-            RuleId rule = it->second;
-            check_error(rule.isValid());
+  std::multimap<std::string, RuleId>::const_iterator it = m_rulesByName.find(name);
+  while(it != m_rulesByName.end()){
+    RuleId rule = it->second;
+    check_error(rule.isValid());
 
-            if(rule->getName() != name)
-                break;
+    if(rule->getName() != name)
+      break;
 
-            results.push_back(rule);
-            ++it;
-        }
-    }
+    results.push_back(rule);
+    ++it;
+  }
+}
 
-    const std::multimap<edouble, RuleId>& RuleSchema::getRules()
-    {
-        return m_rulesByName;
-    }
+const std::multimap<std::string, RuleId>& RuleSchema::getRules() {
+  return m_rulesByName;
+}
 
-    void RuleSchema::purgeAll()
-    {
-        std::multimap<edouble, RuleId>& rules = m_rulesByName;
-        for(std::multimap<edouble, RuleId>::const_iterator it = rules.begin(); it != rules.end(); ++it){
-            RuleId rule = it->second;
-            delete (Rule*) rule;
-        }
+void RuleSchema::purgeAll() {
+  cleanup(m_rulesByName);
+}
 
-        rules.clear();
-    }
-
-    Rule::Rule(const LabelStr& name)
+    Rule::Rule(const std::string& name)
         : m_id(this)
         , m_name(name)
         , m_source("noSrc")
     {
     }
 
-    Rule::Rule(const LabelStr &name, const LabelStr &source)
+    Rule::Rule(const std::string &name, const std::string &source)
         : m_id(this)
         , m_name(name)
         , m_source(source)
@@ -84,11 +73,11 @@ namespace EUROPA {
         m_id.remove();
     }
 
-    const RuleId& Rule::getId() const {return m_id;}
+    const RuleId Rule::getId() const {return m_id;}
 
-    const LabelStr& Rule::getName() const {return m_name;}
+    const std::string& Rule::getName() const {return m_name;}
 
-    const LabelStr& Rule::getSource() const {return m_source;}
+    const std::string& Rule::getSource() const {return m_source;}
 
     std::string Rule::toString() const
     {

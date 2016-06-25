@@ -13,7 +13,7 @@ namespace EUROPA {
 
   // bool PlanDatabaseWriter::s_useStandardKeys = true;
 
-    std::string PlanDatabaseWriter::toString(const PlanDatabaseId& db, bool _useStandardKeys){
+    std::string PlanDatabaseWriter::toString(const PlanDatabaseId db, bool _useStandardKeys){
       useStandardKeys() = _useStandardKeys;
       checkError(useStandardKeys() == _useStandardKeys, "Failed to set standardKeys to method's input values");
       std::stringstream sstr;
@@ -29,8 +29,8 @@ namespace EUROPA {
       indent()++;
       for (ObjectSet::const_iterator oit = objs.begin(); oit != objs.end() ; ++oit) {
 	ObjectId object = *oit;
-	os << indentation() << object->getType().toString() << ":"
-	   << object->getName().toString() << "*************************" << std::endl;
+	os << indentation() << object->getType() << ":"
+	   << object->getName() << "*************************" << std::endl;
 
 
 	std::list<TokenId> toks;
@@ -73,7 +73,7 @@ namespace EUROPA {
 	  indent()--;
 	}
 
-	os << indentation() << "End " << object->getType().toString() << ":" << object->getName().toString()
+	os << indentation() << "End " << object->getType() << ":" << object->getName()
 	   << "*************************" << std::endl;
       }
       indent()--;
@@ -172,18 +172,18 @@ namespace EUROPA {
     return ss.str();
   }
 
-  std::string PlanDatabaseWriter::simpleTokenSummary(const TokenId& token) {
+  std::string PlanDatabaseWriter::simpleTokenSummary(const TokenId token) {
     std::stringstream ss;
     ss << token->toString() << timeDomain(token->start()->lastDomain()) <<  " --> " << timeDomain(token->end()->lastDomain());
     return ss.str();
 
   }
-    void PlanDatabaseWriter::writeToken(const TokenId& t, std::ostream& os) {
+    void PlanDatabaseWriter::writeToken(const TokenId t, std::ostream& os) {
       indent()++;
       check_error(t.isValid());
       TempVarId st = t->start();
       os << indentation() << "\t" << timeDomain(st->lastDomain()) << std::endl;
-      os << indentation() << "\t" << t->getPredicateName().toString() << "(" ;
+      os << indentation() << "\t" << t->getPredicateName() << "(" ;
       std::vector<ConstrainedVariableId> vars = t->parameters();
       for (std::vector<ConstrainedVariableId>::const_iterator varit = vars.begin(); varit != vars.end(); ++varit) {
 	ConstrainedVariableId v = (*varit);
@@ -195,7 +195,7 @@ namespace EUROPA {
 	else
 	  os.unsetf(std::ios::fixed);
 
-	os << v->getName().toString() << "=" << dom;
+	os << v->getName() << "=" << dom;
 	os.unsetf(std::ios::fixed);
       }
       os << ")" <<std::endl;
@@ -224,14 +224,14 @@ namespace EUROPA {
       indent()--;
     }
 
-    void PlanDatabaseWriter::writeVariable(const ConstrainedVariableId& var, std::ostream& os) {
+    void PlanDatabaseWriter::writeVariable(const ConstrainedVariableId var, std::ostream& os) {
       check_error(var.isValid());
       indent()++;
-      os << indentation() << var->getName().toString() << "=" << var->lastDomain() << std::endl;
+      os << indentation() << var->getName() << "=" << var->lastDomain() << std::endl;
       indent()--;
     }
 
-    std::string PlanDatabaseWriter::getKey(const TokenId& token){
+    std::string PlanDatabaseWriter::getKey(const TokenId token){
       if(useStandardKeys())
 	return EUROPA::toString(token->getKey());
       else

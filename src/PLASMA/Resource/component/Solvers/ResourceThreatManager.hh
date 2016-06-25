@@ -1,5 +1,5 @@
-#ifndef _H_ResourceThreatManager
-#define _H_ResourceThreatManager
+#ifndef H_ResourceThreatManager
+#define H_ResourceThreatManager
 
 #include "FlawManager.hh"
 #include "Instant.hh"
@@ -9,10 +9,10 @@ namespace EUROPA {
 
     class DecisionOrder {
     public:
-      DecisionOrder() {}
+      DecisionOrder() : m_cmps() {}
       DecisionOrder(const DecisionOrder& other);
       ~DecisionOrder();
-      bool operator()(const InstantId& a, const InstantId& b, LabelStr& explanation) const;
+      bool operator()(const InstantId a, const InstantId b, std::string& explanation) const;
       void addOrder(InstantComparator* cmp);
     private:
       std::list<InstantComparator*> m_cmps;
@@ -22,19 +22,19 @@ namespace EUROPA {
     public:
       ResourceThreatManager(const TiXmlElement& configData);
       virtual ~ResourceThreatManager();
-      virtual std::string toString(const EntityId& entity) const;
-      virtual bool staticMatch(const EntityId& entity);
-      virtual bool dynamicMatch(const EntityId& entity);
+      virtual std::string toString(const EntityId entity) const;
+      virtual bool staticMatch(const EntityId entity);
+      virtual bool dynamicMatch(const EntityId entity);
       virtual void handleInitialize();
-      virtual bool betterThan(const EntityId& a, const EntityId& b, LabelStr& explanation);
+      virtual bool betterThan(const EntityId a, const EntityId b, std::string& explanation);
       virtual IteratorId createIterator();
 
-      virtual void notifyAdded(const ConstraintId& constraint){}
-      virtual void notifyRemoved(const ConstraintId& constraint) {}
-      virtual void notifyRemoved(const ConstrainedVariableId& var) {}
-      virtual void notifyChanged(const ConstrainedVariableId& variable, const DomainListener::ChangeType& changeType){}
-      virtual void notifyAdded(const TokenId& token) {}
-      virtual void notifyRemoved(const TokenId& token) {}
+      virtual void notifyAdded(const ConstraintId){}
+      virtual void notifyRemoved(const ConstraintId) {}
+      virtual void notifyRemoved(const ConstrainedVariableId) {}
+      virtual void notifyChanged(const ConstrainedVariableId, const DomainListener::ChangeType&){}
+      virtual void notifyAdded(const TokenId) {}
+      virtual void notifyRemoved(const TokenId) {}
       bool noMoreFlaws();
 
     protected:

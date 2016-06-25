@@ -24,67 +24,74 @@
 #include "ObjectType.hh"
 #include "Schema.hh"
 #include "TokenVariable.hh"
+#include "CESchema.hh"
 
 #include "NddlRules.hh"
 #include "NddlUtils.hh"
 #include <typeinfo>
 #include <iterator>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 namespace EUROPA {
 
-  // TODO: keep using pdbClient?
-  const DbClientId& getPDB(EvalContext& context)
-  {
-      // TODO: Add this behavior to EvalContext instead?
-      DbClient* dbClient = (DbClient*)context.getElement("DbClient");
-      if (dbClient != NULL)
-          return dbClient->getId();
+namespace {
+// TODO: keep using pdbClient?
+const DbClientId getPDB(EvalContext& context)
+{
+  // TODO: Add this behavior to EvalContext instead?
+  DbClient* dbClient = reinterpret_cast<DbClient*>(context.getElement("DbClient"));
+  if (dbClient != NULL)
+    return dbClient->getId();
 
-      PlanDatabase* pdb = (PlanDatabase*)context.getElement("PlanDatabase");
-      check_error(pdb != NULL,"Could not find Plan Database in eval context");
-      return pdb->getClient();
+  PlanDatabase* pdb = reinterpret_cast<PlanDatabase*>(context.getElement("PlanDatabase"));
+  check_error(pdb != NULL,"Could not find Plan Database in eval context");
+  return pdb->getClient();
+}
+
+const SchemaId getSchema(EvalContext& context)
+{
+  /* TODO why doesn't this work???
+     Schema* schema = (Schema*)context.getElement("Schema");
+     check_error(schema != NULL,"Could not find Schema in eval context");
+     return schema->getId();
+  */
+  return getPDB(context)->getSchema();
+}
+
+// TODO: move this to the eval contexts to make it cleaner
+void makeConstraint(EvalContext& context,
+                    const std::string& name,
+                    const std::vector<ConstrainedVariableId>& vars,
+                    const std::string& violationExpl)
+{
+  PlanDatabase* pdb = reinterpret_cast<PlanDatabase*>(context.getElement("PlanDatabase"));
+  ConstraintId c = pdb->getClient()->createConstraint(name.c_str(), vars, violationExpl);
+  debugMsg("Interpreter","Added Constraint : " << c->toString());
+
+  InterpretedRuleInstance* rule =
+      reinterpret_cast<InterpretedRuleInstance*>(context.getElement("RuleInstance"));
+  if (rule != NULL) {
+    rule->addConstraint(c);
+    debugMsg("Interpreter:InterpretedRule","Added Constraint : " << c->toString());
+    return;
   }
 
-  const SchemaId& getSchema(EvalContext& context)
-  {
-      /* TODO why doesn't this work???
-      Schema* schema = (Schema*)context.getElement("Schema");
-      check_error(schema != NULL,"Could not find Schema in eval context");
-      return schema->getId();
-      */
-      return getPDB(context)->getSchema();
+  Token* t = reinterpret_cast<Token*>(context.getElement("Token"));
+  if (t != NULL) {
+    t->addStandardConstraint(c);
+    debugMsg("Interpreter:InterpretedToken","Added Constraint : " << c->toString());
+    return;
   }
-
-  // TODO: move this to the eval contexts to make it cleaner
-  void makeConstraint(EvalContext& context,
-                      const LabelStr& name,
-                      const std::vector<ConstrainedVariableId>& vars,
-                      const char* violationExpl)
-  {
-      PlanDatabase* pdb = (PlanDatabase*)(context.getElement("PlanDatabase"));
-      ConstraintId c = pdb->getClient()->createConstraint(name.c_str(), vars, violationExpl);
-      debugMsg("Interpreter","Added Constraint : " << c->toString());
-
-      InterpretedRuleInstance* rule = (InterpretedRuleInstance*)(context.getElement("RuleInstance"));
-      if (rule != NULL) {
-          rule->addConstraint(c);
-          debugMsg("Interpreter:InterpretedRule","Added Constraint : " << c->toString());
-          return;
-      }
-
-      Token* t = (Token*)(context.getElement("Token"));
-      if (t != NULL) {
-          t->addStandardConstraint(c);
-          debugMsg("Interpreter:InterpretedToken","Added Constraint : " << c->toString());
-          return;
-      }
-  }
+}
+}
 
 
   /*
    * ExprConstant
    */
-  ExprConstant::ExprConstant(const char* type, const Domain* domain)
+  ExprConstant::ExprConstant(const std::string& type, const Domain* domain)
     : m_type(type)
     , m_domain(domain)
   {
@@ -100,13 +107,14 @@ namespace EUROPA {
       return m_domain->getDataType();
   }
 
-  std::string getAutoName(const char* prefix)
-  {
-      static int cnt = 0;
-      std::stringstream sstr;
-      sstr << prefix << ++cnt;
-      return sstr.str();
-  }
+namespace {
+std::string getAutoName(const std::string& prefix) {
+  static int cnt = 0;
+  std::stringstream sstr;
+  sstr << prefix << ++cnt;
+  return sstr.str();
+}
+}
 
   DataRef ExprConstant::eval(EvalContext& context) const
   {
@@ -148,48 +156,50 @@ namespace EUROPA {
 
   std::string ExprConstant::getConstantValue() const
   {
-      std::ostringstream os;
-      std::string typeName(m_type.c_str());
+    std::ostringstream os;
+    std::string typeName(m_type.c_str());
 
-      // TODO: this is a hack, where is this being used?
-      if (m_domain->isSingleton()) {
-    	  if (typeName == IntDT::NAME())
-            os << eint(cast_int((m_domain->getSingletonValue())));
-    	  else if (typeName == FloatDT::NAME())
-    	      os << m_domain->getSingletonValue();
-    	  else if (typeName == StringDT::NAME())
-			  os << LabelStr(m_domain->getSingletonValue()).toString();
-          else
-        	  os << "CONST_" << typeName << " " << m_domain->toString();
-      }
+    // TODO: this is a hack, where is this being used?
+    if (m_domain->isSingleton()) {
+      if (typeName == IntDT::NAME())
+        os << eint(cast_int((m_domain->getSingletonValue())));
+      else if (typeName == FloatDT::NAME())
+        os << m_domain->getSingletonValue();
+      else if (typeName == StringDT::NAME())
+        os << LabelStr(m_domain->getSingletonValue()).toString();
       else
-    	  os << "CONST_" << typeName << " " << m_domain->toString();
+        os << "CONST_" << typeName << " " << m_domain->toString();
+    }
+    else
+      os << "CONST_" << typeName << " " << m_domain->toString();
 
-      return os.str();
+    return os.str();
   }
 
 
 
-  /*
-   * ExprVarRef
-   */
-  ExprVarRef::ExprVarRef(const char* varName, const DataTypeId& type)
+/*
+ * ExprVarRef
+ */
+ExprVarRef::ExprVarRef(const std::string& varName, const DataTypeId type)
     : m_varName(varName)
     , m_varType(type)
-  {
-    tokenize(m_varName,m_vars,".");
+    , m_parentName()
+    , m_vars()
+{
+  tokenize(m_varName,m_vars,".");
 
-    if (m_vars.size() > 1) {
-      m_parentName = m_vars[0];
-      m_varName = m_varName.substr(m_parentName.length()+1);
-      m_vars.erase(m_vars.begin());
-      debugMsg("Interpreter:ExprVarRef","Split " << varName << " into " << m_parentName << " and " << m_varName);
-    }
-    else {
-      m_parentName = "";
-      debugMsg("Interpreter:ExprVarRef","Didn't split " << varName);
-    }
+  if (m_vars.size() > 1) {
+    m_parentName = m_vars[0];
+    m_varName = m_varName.substr(m_parentName.length()+1);
+    m_vars.erase(m_vars.begin());
+    debugMsg("Interpreter:ExprVarRef","Split " << varName << " into " << m_parentName << " and " << m_varName);
   }
+  else {
+    m_parentName = "";
+    debugMsg("Interpreter:ExprVarRef","Didn't split " << varName);
+  }
+}
 
   ExprVarRef::~ExprVarRef()
   {
@@ -200,65 +210,64 @@ namespace EUROPA {
       return m_varType;
   }
 
-  DataRef ExprVarRef::eval(EvalContext& context) const
-  {
-    ConstrainedVariableId var;
+DataRef ExprVarRef::eval(EvalContext& context) const {
+  ConstrainedVariableId var;
 
-    if (m_parentName == "") {
-        var = context.getVar(m_varName.c_str());
-        if (var.isNoId()) {
-            // If var evaluates to a token, return state var.
-            TokenId tok = context.getToken(m_varName.c_str());
-            if (tok.isNoId()) {
-                check_runtime_error(!var.isNoId(),std::string("Couldn't find variable or token '" )+m_varName+"' in Evaluation Context");
-                return DataRef::null;
-            }
-            var = tok->getState();
-        }
+  if (m_parentName == "") {
+    var = context.getVar(m_varName.c_str());
+    if (var.isNoId()) {
+      // If var evaluates to a token, return state var.
+      TokenId tok = context.getToken(m_varName.c_str());
+      if (tok.isNoId()) {
+        check_runtime_error(!var.isNoId(),std::string("Couldn't find variable or token '" )+m_varName+"' in Evaluation Context");
+        return DataRef::null;
+      }
+      var = tok->getState();
+    }
+  }
+  else {
+    TokenId tok = context.getToken(m_parentName.c_str());
+    if (tok.isNoId()) {
+      var = context.getVar(m_parentName.c_str());
+      if (var.isNoId()) {
+        check_runtime_error(ALWAYS_FAILS,std::string("Couldn't find variable or token '")+m_parentName+"' in Evaluation Context");
+        return DataRef::null;
+      }
+    }
+
+    // TODO: this isn't pretty, have the different EvalContexts perform the lookup
+    // TODO: is this really still necessary?, code in "else" block should work in ruleInstance context as well
+    RuleInstanceEvalContext *riec = dynamic_cast<RuleInstanceEvalContext*>(&context);
+    if (riec != NULL) {
+      if (tok.isId())
+        var = riec->getRuleInstance()->varfromtok(tok,m_varName);
+      else
+        var = riec->getRuleInstance()->varFromObject(m_parentName,m_varName,false);
     }
     else {
-        TokenId tok = context.getToken(m_parentName.c_str());
-        if (tok.isNoId()) {
-            var = context.getVar(m_parentName.c_str());
-            if (var.isNoId()) {
-                check_runtime_error(ALWAYS_FAILS,std::string("Couldn't find variable or token '")+m_parentName+"' in Evaluation Context");
-                return DataRef::null;
-            }
-        }
+      std::string varName=m_vars[0];
+      unsigned int idx = 0;
 
-        // TODO: this isn't pretty, have the different EvalContexts perform the lookup
-        // TODO: is this really still necessary?, code in "else" block should work in ruleInstance context as well
-        RuleInstanceEvalContext *riec = dynamic_cast<RuleInstanceEvalContext*>(&context);
-        if (riec != NULL) {
-            if (tok.isId())
-                var = riec->getRuleInstance()->varfromtok(tok,m_varName);
-            else
-                var = riec->getRuleInstance()->varFromObject(m_parentName,m_varName,false);
-        }
-        else {
-            std::string varName=m_vars[0];
-            unsigned int idx = 0;
+      if (tok.isId()) {
+        var = tok->getVariable(varName,false);
+        idx++;
+      }
 
-            if (tok.isId()) {
-                var = tok->getVariable(varName,false);
-                idx++;
-            }
+      for (;idx<m_vars.size();idx++) {
+        check_runtime_error(var->derivedDomain().isSingleton(),varName+" must be singleton to be able to get to "+m_vars[idx]);
+        ObjectId object = Entity::getTypedEntity<Object>(var->derivedDomain().getSingletonValue());
+        var = object->getVariable(object->getName()+"."+m_vars[idx]);
+        varName += "." + m_vars[idx];
 
-            for (;idx<m_vars.size();idx++) {
-              check_runtime_error(var->derivedDomain().isSingleton(),varName+" must be singleton to be able to get to "+m_vars[idx]);
-              ObjectId object = Entity::getTypedEntity<Object>(var->derivedDomain().getSingletonValue());
-              var = object->getVariable(object->getName().toString()+"."+m_vars[idx]);
-              varName += "." + m_vars[idx];
-
-              if (var.isNoId())
-                  check_runtime_error(ALWAYS_FAILS,std::string("Couldn't find variable ")+m_vars[idx]+
-                        " in object \""+object->getName().toString()+"\" of type "+object->getType().toString());
-            }
-        }
+        if (var.isNoId())
+          check_runtime_error(ALWAYS_FAILS,std::string("Couldn't find variable ")+m_vars[idx]+
+                              " in object \""+object->getName()+"\" of type "+object->getType());
+      }
     }
-
-    return DataRef(var);
   }
+
+  return DataRef(var);
+}
 
   std::string ExprVarRef::toString() const
   {
@@ -272,8 +281,8 @@ namespace EUROPA {
   /*
    * ExprNewObject
    */
-  ExprNewObject::ExprNewObject(const LabelStr& objectType,
-			       const LabelStr& objectName,
+  ExprNewObject::ExprNewObject(const std::string& objectType,
+			       const std::string& objectName,
 			       const std::vector<Expr*>& argExprs)
     : m_objectType(objectType)
     , m_objectName(objectName)
@@ -300,9 +309,9 @@ namespace EUROPA {
     ConstrainedVariableId thisVar = context.getVar("this");
     ObjectId thisObject =
       (thisVar.isId() ? Entity::getTypedEntity<Object>(thisVar->derivedDomain().getSingletonValue()) : ObjectId::noId());
-    std::string prefix = (thisObject.isId() ? thisObject->getName().toString() + "." : "");
+    std::string prefix = (thisObject.isId() ? thisObject->getName() + "." : "");
 
-    LabelStr name(prefix+m_objectName.toString());
+    std::string name(prefix+m_objectName);
     DbClientId pdb = getPDB(context);
     ObjectId newObject = pdb->createObject(
 						  m_objectType.c_str(),
@@ -320,7 +329,7 @@ namespace EUROPA {
   {
       std::ostringstream os;
 
-      os << "{NEW_OBJECT " << m_objectName.toString() << "(" << m_objectType.toString() << ") ";
+      os << "{NEW_OBJECT " << m_objectName << "(" << m_objectType << ") ";
 
       for (unsigned int i =0; i < m_argExprs.size();i++) {
           if (i>0)
@@ -368,7 +377,7 @@ namespace EUROPA {
       return m_value->eval(context);
   }
 
-  CExprFunction::CExprFunction(const CFunctionId& func, const std::vector<CExpr*>& args)
+  CExprFunction::CExprFunction(const CFunctionId func, const std::vector<CExpr*>& args)
     : m_func(func)
     , m_args(args)
   {
@@ -392,7 +401,7 @@ namespace EUROPA {
       std::string variable = createVariableName();
 
       // TODO: CFunction should know how to eval itself
-      ExprVarDeclaration* var = new ExprVarDeclaration(variable.c_str(), getDataType(), NULL, false);
+      ExprVarDeclaration* var = new ExprVarDeclaration(variable, getDataType(), NULL, false);
       DataRef output = var->eval(context);
 
       Expr* varRef = new ExprVarRef(variable.c_str(), getDataType());
@@ -415,7 +424,7 @@ namespace EUROPA {
         args += m_args[i]->toString() + std::string("_");
       }
 
-      return m_func->getName().toString() + "__" + args + "_";
+      return m_func->getName() + "__" + args + "_";
   }
 
   CExprBinary::CExprBinary(std::string op, CExpr* lhs, CExpr* rhs)
@@ -473,11 +482,13 @@ namespace EUROPA {
       }
   }
 
-  bool isTimepoint(DataRef var) {
-    ConstrainedVariable *cvar = var.getValue();
-    return dynamic_cast< TokenVariable<IntervalIntDomain>* >(cvar) != NULL
-      && (cvar->getName().toString() == "end" || cvar->getName().toString() == "start");
-  }
+namespace {
+bool isTimepoint(DataRef var) {
+  ConstrainedVariable *cvar = var.getValue();
+  return dynamic_cast< TokenVariable<IntervalIntDomain>* >(cvar) != NULL
+      && (cvar->getName() == "end" || cvar->getName() == "start");
+}
+}
 
   bool CExprBinary::isSingleton() {
     return false;
@@ -492,12 +503,12 @@ namespace EUROPA {
       std::string constraint = "", returnType = "";
       bool flipArguments = false;
       if (hasReturnValue()) {
-          if (m_operator == "==") { constraint = "testEQ"; returnType = "bool"; }
-          if (m_operator == "<=") { constraint = "testLEQ"; returnType = "bool"; }
-          if (m_operator == ">=") { constraint = "testLEQ"; returnType = "bool"; flipArguments = true; }
-          if (m_operator == "!=") { constraint = "testNEQ"; returnType = "bool"; }
-          if (m_operator == ">") { constraint = "TestLessThan"; returnType = "bool"; flipArguments = true; }
-          if (m_operator == "<") { constraint = "TestLessThan"; returnType = "bool"; }
+          if (m_operator == "==") { constraint = "testEq"; returnType = "bool"; }
+          if (m_operator == "<=") { constraint = "testLeq"; returnType = "bool"; }
+          if (m_operator == ">=") { constraint = "testLeq"; returnType = "bool"; flipArguments = true; }
+          if (m_operator == "!=") { constraint = "testNeq"; returnType = "bool"; }
+          if (m_operator == ">") { constraint = "testLessThan"; returnType = "bool"; flipArguments = true; }
+          if (m_operator == "<") { constraint = "testLessThan"; returnType = "bool"; }
           if (m_operator == "+") { constraint = "addEq"; }
           if (m_operator == "-") { constraint = "addEq"; }
           if (m_operator == "*") { constraint = "mulEq"; }
@@ -560,7 +571,7 @@ namespace EUROPA {
               std::string variable = this->createVariableName();
 
               //Declare the implicit return variable
-              ExprVarDeclaration* var = new ExprVarDeclaration(variable.c_str(), data, NULL, false);
+              ExprVarDeclaration* var = new ExprVarDeclaration(variable, data, NULL, false);
               output = var->eval(context);
 
               delete var;
@@ -633,12 +644,12 @@ namespace EUROPA {
     return "BadExpression";
   }
 
-  ExprConstraint::ExprConstraint(const char* name,const std::vector<Expr*>& args, const char* violationExpl)
+  ExprConstraint::ExprConstraint(const std::string& name,const std::vector<Expr*>& args, const std::string& violationExpl)
     : m_name(name)
     , m_args(args)
     , m_violationExpl("")
   {
-      if (violationExpl != NULL)
+      if (!violationExpl.empty())
           m_violationExpl = violationExpl;
   }
 
@@ -649,164 +660,158 @@ namespace EUROPA {
       m_args.clear();
   }
 
-  std::string varsToString(const std::vector<ConstrainedVariableId>& vars)
-  {
-    std::ostringstream os;
-    for (unsigned int i=0; i < vars.size(); i++) {
-      if (i>0) os << ",";
-      os << vars[i]->toString();
-    }
-
-    return os.str();
+DataRef ExprConstraint::eval(EvalContext& context) const
+{
+  std::vector<ConstrainedVariableId> vars;
+  for (unsigned int i=0; i < m_args.size(); i++) {
+    DataRef arg = m_args[i]->eval(context);
+    vars.push_back(arg.getValue());
   }
 
-  DataRef ExprConstraint::eval(EvalContext& context) const
-  {
-    std::vector<ConstrainedVariableId> vars;
-    for (unsigned int i=0; i < m_args.size(); i++) {
-      DataRef arg = m_args[i]->eval(context);
-      vars.push_back(arg.getValue());
-    }
+  makeConstraint(context,m_name,vars,m_violationExpl.c_str());
 
-    makeConstraint(context,m_name,vars,m_violationExpl.c_str());
+  return DataRef::null;
+}
 
-    return DataRef::null;
-  }
+std::string ExprConstraint::toString() const
+{
+  std::stringstream os;
 
-  std::string ExprConstraint::toString() const
-  {
-      std::stringstream os;
+  os << "{CONSTRAINT:" << m_name.c_str() << " (";
 
-      os << "{CONSTRAINT:" << m_name.c_str() << " (";
+  for (unsigned int i=0;i<m_args.size();i++)
+    os << m_args[i]->toString() << " ";
+  os << ") " << m_violationExpl << "}";
 
-      for (unsigned int i=0;i<m_args.size();i++)
-             os << m_args[i]->toString() << " ";
-      os << ") " << m_violationExpl << "}";
+  return os.str();
+}
 
-      return os.str();
-  }
+namespace {
+bool isClass(EvalContext& ctx,const std::string& className) {
+  return getSchema(ctx)->isObjectType(className);
+}
 
-  bool isClass(EvalContext& ctx,const LabelStr& className)
-  {
-      return getSchema(ctx)->isObjectType(className);
-  }
 
   // see ModelAccessor.isConstrained in Nddl compiler
-  bool isConstrained(EvalContext& context, const LabelStr& predicateInstance)
-  {
-    unsigned int tokenCnt = predicateInstance.countElements(".");
+bool isConstrained(EvalContext& context, const std::string& predicateInstance){
+  unsigned long tokenCnt =
+      std::count(predicateInstance.begin(), predicateInstance.end(), '.') + 1;
 
-    // If the predicate is not qualified that means it belongs to the object in scope
-    if (tokenCnt == 1)
-      return true;
+  // If the predicate is not qualified that means it belongs to the object in scope
+  if (tokenCnt == 1)
+    return true;
 
-    // If the prefix is a class, it means it can be any object instance, so it must not be constrained
-    LabelStr prefix(predicateInstance.getElement(0,"."));
-    if (!isClass(context,prefix))
-      return true;
+  // If the prefix is a class, it means it can be any object instance, so it must not be constrained
+  std::string prefix(predicateInstance.substr(0, predicateInstance.find('.')));
+  if (!isClass(context,prefix))
+    return true;
 
-    return false;
+  return false;
+}
+
+std::string checkPredicateType(EvalContext& ctx,const std::string& type) {
+  check_runtime_error(getSchema(ctx)->isPredicate(type),type+" is not a Type");
+  return type;
+}
+
+std::string getObjectVarClass(EvalContext& ctx,const std::string& className,const std::string& var) {
+  const SchemaId schema = getSchema(ctx);
+  check_runtime_error(schema->hasMember(className,var),className+" has no member called "+var);
+  return schema->getMemberType(className,var);
+}
+
+std::string getTokenVarClass(EvalContext& ctx,const std::string& className,const std::string& predName,const std::string& var){
+  if (strcmp(var.c_str(),"object") == 0) // is it the object variable?
+    return className;
+  else { // look through the parameters to the token
+    const SchemaId schema = getSchema(ctx);
+    if (schema->hasMember(predName,var))
+      return schema->getMemberType(predName,var);
   }
 
-  LabelStr checkPredicateType(EvalContext& ctx,const LabelStr& type)
-  {
-    check_runtime_error(getSchema(ctx)->isPredicate(type),type.toString()+" is not a Type");
-    return type;
-  }
-
-  LabelStr getObjectVarClass(EvalContext& ctx,const LabelStr& className,const LabelStr& var)
-  {
-    const SchemaId& schema = getSchema(ctx);
-    check_runtime_error(schema->hasMember(className,var),className.toString()+" has no member called "+var.toString());
-    return schema->getMemberType(className,var);
-  }
-
-  LabelStr getTokenVarClass(EvalContext& ctx,const LabelStr& className,const LabelStr& predName,const LabelStr& var)
-  {
-      if (strcmp(var.c_str(),"object") == 0) // is it the object variable?
-          return className;
-      else { // look through the parameters to the token
-          const SchemaId& schema = getSchema(ctx);
-          if (schema->hasMember(predName,var))
-              return schema->getMemberType(predName,var);
-      }
-
-      // if everything else fails, see if it's an object member
-      return getObjectVarClass(ctx,className,var);
-  }
+  // if everything else fails, see if it's an object member
+  return getObjectVarClass(ctx,className,var);
+}
 
   /*
    * figures out the type of a predicate given an instance
    *
    */
-  LabelStr predicateInstanceToType(
-               EvalContext& ctx,
-               const char* predicateName,
-               const char* predicateInstance)
-  {
-      // see ModelAccessor.getSlaveObjectType() in NDDL compiler
-      ConstrainedVariableId obj = ctx.getVar("object");
-      check_error(obj.isId(),"Failed to find 'object' var in predicateInstanceToType()");
-      const char* className = obj->baseDomain().getTypeName().c_str();
-      LabelStr str(predicateInstance);
+std::string predicateInstanceToType(
+    EvalContext& ctx,
+    const std::string& predicateName,
+    const std::string& predicateInstance){
+  // see ModelAccessor.getSlaveObjectType() in NDDL compiler
+  ConstrainedVariableId obj = ctx.getVar("object");
+  check_error(obj.isId(),"Failed to find 'object' var in predicateInstanceToType()");
+  const std::string& className = obj->baseDomain().getTypeName().c_str();
+  std::string str(predicateInstance);
 
-      unsigned int tokenCnt = str.countElements(".");
+  unsigned long tokenCnt = std::count(str.begin(), str.end(), '.') + 1;
 
-      if (tokenCnt == 1) {
-          std::string retval = std::string(className)+"."+predicateInstance;
-          return checkPredicateType(ctx,LabelStr(retval));
-      }
-      else if (tokenCnt == 2) {
-          LabelStr prefix(str.getElement(0,"."));
-          LabelStr suffix(str.getElement(1,"."));
+  if (tokenCnt == 1) {
+    std::string retval = std::string(className)+"."+predicateInstance;
+    return checkPredicateType(ctx,std::string(retval));
+  }
+  else if (tokenCnt == 2) {
+    std::string prefix(str.substr(0, str.find('.')));
+    std::string suffix(str.substr(str.find('.') + 1));
 
-          if (prefix.toString() == "object") {
-              std::string retval = std::string(className)+"."+suffix.toString();
-              return checkPredicateType(ctx,LabelStr(retval.c_str()));
-          }
-          else if (isClass(ctx,prefix)) {
-              return checkPredicateType(ctx,LabelStr(predicateInstance));
-          }
-          else {
-              ConstrainedVariableId var = ctx.getVar(prefix.c_str());
-              if (var.isId()) {
-                  std::string clazz = var->baseDomain().getTypeName().c_str();
-                  return checkPredicateType(ctx,clazz+"."+suffix.toString());
-              }
-              else {
-                  LabelStr clazz = getTokenVarClass(ctx,className,predicateName,prefix);
-                  std::string retval = clazz.toString()+"."+suffix.toString();
-                  return checkPredicateType(ctx,LabelStr(retval.c_str()));
-              }
-          }
+    if (prefix == "object") {
+      std::string retval = std::string(className)+"."+suffix;
+      return checkPredicateType(ctx,std::string(retval.c_str()));
+    }
+    else if (isClass(ctx,prefix)) {
+      return checkPredicateType(ctx,std::string(predicateInstance));
+    }
+    else {
+      ConstrainedVariableId var = ctx.getVar(prefix.c_str());
+      if (var.isId()) {
+        std::string clazz = var->baseDomain().getTypeName().c_str();
+        return checkPredicateType(ctx,clazz+"."+suffix);
       }
       else {
-          LabelStr var = str.getElement(0,".");
-          LabelStr clazz;
-          ConstrainedVariableId v = ctx.getVar(var.c_str());
-          if (v.isId())
-              clazz = v->baseDomain().getTypeName().c_str();
-          else
-              clazz = getTokenVarClass(ctx,className,predicateName,var);
-
-          for (unsigned int i=1;i<tokenCnt-1;i++) {
-              LabelStr var = str.getElement(i,".");
-              clazz = getObjectVarClass(ctx,clazz,var);
-          }
-
-          LabelStr predicate = str.getElement(tokenCnt-1,".");
-          std::string retval = clazz.toString() + "." + predicate.toString();
-          return checkPredicateType(ctx,LabelStr(retval));
+        std::string clazz = getTokenVarClass(ctx,className,predicateName,prefix);
+        std::string retval = clazz+"."+suffix;
+        return checkPredicateType(ctx,retval.c_str());
       }
+    }
   }
+  else {
+    std::vector<std::string> contents;
+    boost::split(contents, str, boost::is_any_of("."));
+    
+    std::string var = contents[0];//str.substr(0, str.find('.'));
 
-  PredicateInstanceRef::PredicateInstanceRef(const TokenTypeId& tokenType, const char* predInstance, const char* predName, const char* annotation)
-      : m_tokenType(tokenType)
-  	  , m_predicateInstance(predInstance != NULL ? predInstance : "")
-      , m_predicateName(predName != NULL ? predName : "")
+    std::string clazz;
+    ConstrainedVariableId v = ctx.getVar(var.c_str());
+    if (v.isId())
+      clazz = v->baseDomain().getTypeName().c_str();
+    else
+      clazz = getTokenVarClass(ctx,className,predicateName,var);
+
+    for(std::vector<std::string>::const_iterator it = contents.begin() + 1;
+        it != (contents.begin() + (contents.size() - 1)); ++it) {
+      clazz = getObjectVarClass(ctx, clazz, *it);
+    }
+    std::string predicate = contents.back();
+    std::string retval = clazz + "." + predicate;
+    return checkPredicateType(ctx,retval);
+  }
+}
+}
+
+PredicateInstanceRef::PredicateInstanceRef(const TokenTypeId tokenType,
+                                           const std::string& predInstance, 
+                                           const std::string& predName, 
+                                           const std::string& annotation)
+    : m_tokenType(tokenType)
+    , m_predicateInstance(predInstance)
+    , m_predicateName(predName)
+    , m_attributes(0)
   {
 	  m_attributes=0;
-	  if (annotation != NULL) {
+	  if (!annotation.empty()) {
 		  std::string str = annotation;
 		  if (str=="condition")
 			  m_attributes |= PSTokenType::CONDITION;
@@ -823,87 +828,94 @@ namespace EUROPA {
 
   // TODO: passing relation doesn't seem like a good idea, since a token may have more than one relation to its
   // master. However, MatchingEngine matches on that, so keeping it for now.
-  TokenId PredicateInstanceRef::getToken(EvalContext& context, const char* relationName, bool isFact, bool isRejectable)
-  {
-      TokenId result;
-      if (m_predicateInstance.length() == 0) {
-          result = context.getToken(m_predicateName.c_str());
-      }
-      else {
-    	  InterpretedRuleInstance* rule = (InterpretedRuleInstance*)(context.getElement("RuleInstance"));
-    	  if (rule != NULL) {
-    		  result = createSubgoal(context,rule,relationName);
-    		  result->addAttributes(m_attributes);
-    	  }
-    	  else
-    		  result = createGlobalToken(context, isFact, isRejectable);
-      }
-
-      //TODO: In the future, this might be a hook into the NDDL error reporting system.
-      checkError(result != TokenId() && result.isId(), "Error, no token " << m_predicateInstance << " "
-		 << m_predicateName << " in relation: " << relationName << ".");
-      return result;
+TokenId PredicateInstanceRef::getToken(EvalContext& context, const std::string& relationName, bool isFact, bool isRejectable)
+{
+  TokenId result;
+  if (m_predicateInstance.length() == 0) {
+    result = context.getToken(m_predicateName.c_str());
+  }
+  else {
+    InterpretedRuleInstance* rule = reinterpret_cast<InterpretedRuleInstance*>(context.getElement("RuleInstance"));
+    if (rule != NULL) {
+      result = createSubgoal(context,rule,relationName);
+      result->addAttributes(m_attributes);
+    }
+    else
+      result = createGlobalToken(context, isFact, isRejectable);
   }
 
-  TokenId PredicateInstanceRef::createGlobalToken(EvalContext& context, bool isFact, bool isRejectable)
-  {
-      debugMsg("Interpreter:createToken", "creating Token:" << m_predicateInstance << " " << m_predicateName);
+  //TODO: In the future, this might be a hook into the NDDL error reporting system.
+  checkError(result != TokenId() && result.isId(), "Error, no token " << m_predicateInstance << " "
+             << m_predicateName << " in relation: " << relationName << ".");
+  return result;
+}
 
-      // The type may be qualified with an object name, in which case we should get the
-      // object and specify it. We will also have to generate the appropriate type designation
-      // by extracting the class from the object
-      ObjectId object;
-      const char* tokenType = DbClientTransactionPlayer::getObjectAndType(getSchema(context),getPDB(context),m_predicateInstance.c_str(),object);
-      const char* tokenName = (m_predicateName.length()>0 ? m_predicateName.c_str() : NULL);
+TokenId PredicateInstanceRef::createGlobalToken(EvalContext& context, bool isFact,
+                                                bool isRejectable) {
+  debugMsg("Interpreter:createToken",
+           "creating Token:" << m_predicateInstance << " " << m_predicateName);
 
-      TokenId token = getPDB(context)->createToken(tokenType,tokenName,isRejectable,isFact);
+  // The type may be qualified with an object name, in which case we should get the
+  // object and specify it. We will also have to generate the appropriate type designation
+  // by extracting the class from the object
+  ObjectId object;
+  const std::string tokenType =
+      DbClientTransactionPlayer::getObjectAndType(getSchema(context),getPDB(context),
+                                                  m_predicateInstance,object);
+  const std::string tokenName = m_predicateName;
 
-      if (object.isId()) {
-          // We restrict the base domain permanently since the name is specifically mentioned on creation
-          token->getObject()->restrictBaseDomain(object->getThis()->baseDomain());
-      }
+  TokenId token = getPDB(context)->createToken(tokenType,tokenName,isRejectable,isFact);
 
-      debugMsg("Interpreter:createToken", "created Token:" << tokenName
-                  << " of type " << tokenType
-                  << " isFact:" << isFact
-                  << " isRejectable:" << isRejectable
-      );
-
-      return token;
+  if (object.isId()) {
+    // We restrict the base domain permanently since the name is specifically mentioned on creation
+    token->getObject()->restrictBaseDomain(object->getThis()->baseDomain());
   }
 
-  TokenId PredicateInstanceRef::createSubgoal(EvalContext& context, InterpretedRuleInstance* rule, const char* relationName)
-  {
-      // TODO: cache this? new parser is able to pass this in, do it when nddl-xml is gone.
-      LabelStr predicateType = predicateInstanceToType(context,m_predicateName.c_str(),m_predicateInstance.c_str());
-      debugMsg("Interpreter:InterpretedRule","Creating subgoal " << predicateType.c_str() << ":" << m_predicateName);
+  debugMsg("Interpreter:createToken", "created Token:" << tokenName
+           << " of type " << tokenType
+           << " isFact:" << isFact
+           << " isRejectable:" << isRejectable
+           );
 
-      LabelStr predicateName(m_predicateName); // TODO: auto-generate name if not provided?
-      LabelStr predicateInstance(m_predicateInstance);
-      bool constrained = isConstrained(context,predicateInstance);
-      ConstrainedVariableId owner;
-      if (constrained) {
-        unsigned int tokenCnt = predicateInstance.countElements(".");
-        if (tokenCnt == 1)
-            owner = context.getVar("object");
-        else
-            owner = context.getVar(predicateInstance.getElement(0,".").c_str());
-      }
+  return token;
+}
 
-      TokenId slave = rule->createSubgoal(
-                                   predicateName,
-                                   predicateType,
-                                   predicateInstance,
-                                   relationName,
-                                   constrained,
-                                   owner
-                                   );
+TokenId PredicateInstanceRef::createSubgoal(EvalContext& context,
+                                            InterpretedRuleInstance* rule,
+                                            const std::string& relationName) {
+  // TODO: cache this? new parser is able to pass this in, do it when nddl-xml is gone.
+  std::string predicateType = predicateInstanceToType(context,m_predicateName.c_str(),
+                                                      m_predicateInstance.c_str());
+  debugMsg("Interpreter:InterpretedRule",
+           "Creating subgoal " << predicateType.c_str() << ":" << m_predicateName);
 
-      context.addToken(predicateName.c_str(),slave);
-      debugMsg("Interpreter:InterpretedRule","Created  subgoal " << predicateType.toString() << ":" << m_predicateName);
-
-      return slave;
+  std::string predicateName(m_predicateName); // TODO: auto-generate name if not provided?
+  std::string predicateInstance(m_predicateInstance);
+  bool constrained = isConstrained(context,predicateInstance);
+  ConstrainedVariableId owner;
+  if (constrained) {
+    unsigned long tokenCnt =
+        std::count(predicateInstance.begin(), predicateInstance.end(), '.') + 1;
+    if (tokenCnt == 1)
+      owner = context.getVar("object");
+    else
+      owner = context.getVar(predicateInstance.substr(0,predicateInstance.find('.')).c_str());
   }
+
+  TokenId slave = rule->createSubgoal(
+      predicateName,
+      predicateType,
+      predicateInstance,
+      relationName,
+      constrained,
+      owner
+                                      );
+
+  context.addToken(predicateName.c_str(),slave);
+  debugMsg("Interpreter:InterpretedRule","Created  subgoal " << predicateType << ":" << m_predicateName);
+
+  return slave;
+}
 
   int PredicateInstanceRef::getAttributes(  ) const
   {
@@ -915,7 +927,7 @@ namespace EUROPA {
     return m_tokenType;
   }
 
-  ExprRelation::ExprRelation(const char* relation,
+  ExprRelation::ExprRelation(const std::string& relation,
                              PredicateInstanceRef* origin,
                              const std::vector<PredicateInstanceRef*>& targets)
     : m_relation(relation)
@@ -924,7 +936,7 @@ namespace EUROPA {
   {
       if (m_origin == NULL) {
     	  // TODO: may want to provide the actual token type at some point
-          m_origin = new PredicateInstanceRef(TokenTypeId::noId(),NULL,"this","");
+          m_origin = new PredicateInstanceRef(TokenTypeId::noId(),"","this","");
       }
 
   }
@@ -950,110 +962,111 @@ namespace EUROPA {
     std::vector<ConstrainedVariableId> vars;\
     vars.push_back(origin->originvar());    \
     vars.push_back(target->targetvar());    \
-    makeConstraint(context,LabelStr(#relationname), vars, NULL); \
+    makeConstraint(context,#relationname, vars, ""); \
   }
 
 
 #define makeStrictPrecedenceRelation(origin, originvar, target, targetvar) { \
-    PlanDatabase* db = (PlanDatabase*)(context.getElement("PlanDatabase"));\
+    PlanDatabase* db = reinterpret_cast<PlanDatabase*>(context.getElement("PlanDatabase"));\
     std::vector<ConstrainedVariableId> vars;				\
     ConstrainedVariableId var = (new Variable<IntervalIntDomain>(db->getConstraintEngine(), IntervalIntDomain(1, PLUS_INFINITY)))->getId(); \
     vars.push_back(origin->originvar());				\
     vars.push_back(var);						\
     vars.push_back(target->targetvar());				\
-    makeConstraint(context, "temporalDistance", vars, NULL);			\
+    makeConstraint(context, "temporalDistance", vars, "");			\
   }
 
-  void createRelation(EvalContext& context,
-                      const char* relationName,
-                      TokenId origin,
-                      TokenId target)
-  {
-      // Allen Relations according to EUROPA
-      // See ConstraintLibraryReference on the wiki
-      if (strcmp(relationName,"meets") == 0) {
-        makeRelation(concurrent, origin, end, target, start);
-      }
-      else if (strcmp(relationName,"met_by") == 0) {
-        makeRelation(concurrent, target, end, origin, start);
-      }
-      else if (strcmp(relationName,"contains") == 0) {
-        makeRelation(precedes, origin, start, target, start);
-        makeRelation(precedes, target, end, origin, end);
-        makeRelation(leq, target, duration, origin, duration);
-      }
-      else if (strcmp(relationName,"contained_by") == 0) {
-        makeRelation(precedes, target, start, origin, start);
-        makeRelation(precedes, origin, end, target, end);
-        makeRelation(leq, origin, duration, target, duration);
-      }
-      else if (strcmp(relationName,"before") == 0) {
-        makeRelation(precedes, origin, end, target, start);
-      }
-      else if (strcmp(relationName,"after") == 0) {
-        makeRelation(precedes, target, end, origin, start);
-      }
-      else if (strcmp(relationName,"starts") == 0) {
-        makeRelation(concurrent, origin, start, target, start);
-      }
-      else if (strcmp(relationName,"ends") == 0) {
-        makeRelation(concurrent, target, end, origin, end);
-      }
-      else if (strcmp(relationName, "parallels") == 0) {
-        makeRelation(precedes, origin, start, target, start);
-        makeRelation(precedes, origin, end, target, end);
-      }
-      else if (strcmp(relationName, "paralleled_by") == 0) {
-        makeRelation(precedes, target, start, origin, start);
-        makeRelation(precedes, target, end, origin, end);
-      }
-      else if (strcmp(relationName,"ends_after") == 0) {
-        makeStrictPrecedenceRelation(target, end, origin, end);
-      }
-      else if (strcmp(relationName,"ends_before") == 0) {
-        makeStrictPrecedenceRelation(origin, end, target, end);
-      }
-      else if (strcmp(relationName,"ends_after_start") == 0) {
-        makeStrictPrecedenceRelation(target, start, origin, end);
-      }
-      else if (strcmp(relationName,"starts_before_end") == 0) {
-        makeStrictPrecedenceRelation(origin, start, target, end);
-      }
-      else if (strcmp(relationName,"starts_during") == 0) {
-        makeRelation(precedes, target, start, origin, start);
-        makeStrictPrecedenceRelation(origin, start, target, end);
-      }
-      else if (strcmp(relationName,"ends_during") == 0) {
-        makeStrictPrecedenceRelation(target, start, origin, end);
-        makeRelation(precedes, origin, end, target, end);
-      }
-      else if (strcmp(relationName,"contains_start") == 0) {
-        makeRelation(precedes, origin, start, target, start);
-        makeStrictPrecedenceRelation(target, start, origin, end);
-      }
-      else if (strcmp(relationName,"contains_end") == 0) {
-        makeStrictPrecedenceRelation(origin, start, target, end);
-        makeRelation(precedes, origin, end, target, end);
-      }
-      else if (strcmp(relationName,"starts_after") == 0) {
-        makeStrictPrecedenceRelation(target, start, origin, start);
-      }
-      else if (strcmp(relationName,"starts_before") == 0) {
-        makeStrictPrecedenceRelation(origin, start, target, start);
-      }
-      else if (strcmp(relationName,"equals") == 0) {
-        makeRelation(concurrent, origin, start, target, start);
-        makeRelation(concurrent, target, end, origin, end);
-        makeRelation(eq, origin, duration, target, duration);
-      }
-      else {
-        check_runtime_error(strcmp(relationName,"any") == 0,std::string("Unrecognized relation:")+relationName);
-      }
+namespace {
+void createRelation(EvalContext& context,
+                    const std::string& relationName,
+                    TokenId origin,
+                    TokenId target) {
+  // Allen Relations according to EUROPA
+  // See ConstraintLibraryReference on the wiki
+  if (relationName == "meets") {
+    makeRelation(concurrent, origin, end, target, start);
   }
+  else if (relationName == "met_by") {
+    makeRelation(concurrent, target, end, origin, start);
+  }
+  else if (relationName == "contains") {
+    makeRelation(precedes, origin, start, target, start);
+    makeRelation(precedes, target, end, origin, end);
+    makeRelation(leq, target, duration, origin, duration);
+  }
+  else if (relationName == "contained_by") {
+    makeRelation(precedes, target, start, origin, start);
+    makeRelation(precedes, origin, end, target, end);
+    makeRelation(leq, origin, duration, target, duration);
+  }
+  else if (relationName == "before") {
+    makeRelation(precedes, origin, end, target, start);
+  }
+  else if (relationName == "after") {
+    makeRelation(precedes, target, end, origin, start);
+  }
+  else if (relationName == "starts") {
+    makeRelation(concurrent, origin, start, target, start);
+  }
+  else if (relationName == "ends") {
+    makeRelation(concurrent, target, end, origin, end);
+  }
+  else if (relationName ==  "parallels") {
+    makeRelation(precedes, origin, start, target, start);
+    makeRelation(precedes, origin, end, target, end);
+  }
+  else if (relationName ==  "paralleled_by") {
+    makeRelation(precedes, target, start, origin, start);
+    makeRelation(precedes, target, end, origin, end);
+  }
+  else if (relationName == "ends_after") {
+    makeStrictPrecedenceRelation(target, end, origin, end);
+  }
+  else if (relationName == "ends_before") {
+    makeStrictPrecedenceRelation(origin, end, target, end);
+  }
+  else if (relationName == "ends_after_start") {
+    makeStrictPrecedenceRelation(target, start, origin, end);
+  }
+  else if (relationName == "starts_before_end") {
+    makeStrictPrecedenceRelation(origin, start, target, end);
+  }
+  else if (relationName == "starts_during") {
+    makeRelation(precedes, target, start, origin, start);
+    makeStrictPrecedenceRelation(origin, start, target, end);
+  }
+  else if (relationName == "ends_during") {
+    makeStrictPrecedenceRelation(target, start, origin, end);
+    makeRelation(precedes, origin, end, target, end);
+  }
+  else if (relationName == "contains_start") {
+    makeRelation(precedes, origin, start, target, start);
+    makeStrictPrecedenceRelation(target, start, origin, end);
+  }
+  else if (relationName == "contains_end") {
+    makeStrictPrecedenceRelation(origin, start, target, end);
+    makeRelation(precedes, origin, end, target, end);
+  }
+  else if (relationName == "starts_after") {
+    makeStrictPrecedenceRelation(target, start, origin, start);
+  }
+  else if (relationName == "starts_before") {
+    makeStrictPrecedenceRelation(origin, start, target, start);
+  }
+  else if (relationName == "equals") {
+    makeRelation(concurrent, origin, start, target, start);
+    makeRelation(concurrent, target, end, origin, end);
+    makeRelation(eq, origin, duration, target, duration);
+  }
+  else {
+    check_runtime_error(relationName == "any",std::string("Unrecognized relation:")+relationName);
+  }
+}
+}
 
   DataRef ExprRelation::eval(EvalContext& context) const
   {
-    const char* relationName = m_relation.c_str();
+    const std::string& relationName = m_relation.c_str();
 
     TokenId origin = m_origin->getToken(context,"any"); // This will create a subgoal if necessary
     for (unsigned int i=0;i<m_targets.size();i++) {
@@ -1065,7 +1078,7 @@ namespace EUROPA {
     return DataRef::null;
   }
 
-  ExprIfGuard::ExprIfGuard(const char* op, Expr* lhs,Expr* rhs)
+  ExprIfGuard::ExprIfGuard(const std::string& op, Expr* lhs,Expr* rhs)
     : m_op(op)
     , m_lhs(lhs)
     , m_rhs(rhs)
@@ -1082,7 +1095,7 @@ namespace EUROPA {
   Expr* ExprIfGuard::getLhs() const { return m_lhs; }
   Expr* ExprIfGuard::getRhs() const { return m_rhs; }
 
-  DataRef ExprIfGuard::eval(EvalContext& context) const
+  DataRef ExprIfGuard::eval(EvalContext&) const
   {
       // TODO: rework ExprIf implementation so that this can be evaluated
       check_runtime_error(ALWAYS_FAILS,"ExprIfGuard can't be evaluated");
@@ -1189,7 +1202,7 @@ namespace EUROPA {
       return os.str();
   }
 
-  ExprLoop::ExprLoop(const char* varName, const char* varValue,const std::vector<Expr*>& loopBody)
+  ExprLoop::ExprLoop(const std::string& varName, const std::string& varValue,const std::vector<Expr*>& loopBody)
     : m_varName(varName)
     , m_varValue(varValue)
     , m_loopBody(loopBody)
@@ -1203,55 +1216,59 @@ namespace EUROPA {
       m_loopBody.clear();
   }
 
-  DataRef ExprLoop::doEval(RuleInstanceEvalContext& context) const
-  {
-    context.getRuleInstance()->executeLoop(context,m_varName,m_varValue,m_loopBody);
-    debugMsg("Interpreter:InterpretedRule","Evaluated LOOP " << m_varName.toString() << "," << m_varValue.toString());
-    return DataRef::null;
-  }
+DataRef ExprLoop::doEval(RuleInstanceEvalContext& context) const {
+  context.getRuleInstance()->executeLoop(context,m_varName,m_varValue,m_loopBody);
+  debugMsg("Interpreter:InterpretedRule",
+           "Evaluated LOOP " << m_varName << "," << m_varValue);
+  return DataRef::null;
+}
 
     /*
      * InterpretedToken
      */
-    InterpretedToken::InterpretedToken(
-                     const PlanDatabaseId& planDatabase,
-                     const LabelStr& predicateName,
-                     const std::vector<Expr*>& body,
-                     const bool& rejectable,
-                     const bool& isFact,
-                     const bool& close)
-      : IntervalToken(planDatabase,
-                        predicateName,
-                        rejectable,
-                        isFact,
-                        IntervalIntDomain(),                  // start
-                        IntervalIntDomain(),                  // end
-                        IntervalIntDomain(1, PLUS_INFINITY),  // duration
-                        Token::noObject(),                    // Object Name
-                        false)
-    {
-    	commonInit(body, close);
-    	debugMsg("Interpreter:InterpretedToken","Created token(" << getKey() << ") of type:" << predicateName.toString() << " objectVar=" << getVariable("object")->toString());
-    }
+InterpretedToken::InterpretedToken(
+    const PlanDatabaseId planDatabase,
+    const std::string& predicateName,
+    const std::vector<Expr*>& body,
+    const bool& rejectable,
+    const bool& _isFact,
+    const bool& _close)
+    : IntervalToken(planDatabase,
+                    predicateName,
+                    rejectable,
+                    _isFact,
+                    IntervalIntDomain(),                  // start
+                    IntervalIntDomain(),                  // end
+                    IntervalIntDomain(1, PLUS_INFINITY),  // duration
+                    Token::noObject(),                    // Object Name
+                    false)
+{
+  commonInit(body, _close);
+  debugMsg("Interpreter:InterpretedToken",
+           "Created token(" << getKey() << ") of type:" << predicateName <<
+           " objectVar=" << getVariable("object")->toString());
+}
 
-  InterpretedToken::InterpretedToken(
-                     const TokenId& master,
-				     const LabelStr& predicateName,
-				     const LabelStr& relation,
-                     const std::vector<Expr*>& body,
-				     const bool& close)
-    : IntervalToken(master,
+InterpretedToken::InterpretedToken(
+    const TokenId _master,
+    const std::string& predicateName,
+    const std::string& relation,
+    const std::vector<Expr*>& body,
+    const bool& _close)
+    : IntervalToken(_master,
 		    relation,
 		    predicateName,
 		    IntervalIntDomain(),                 // start
 		    IntervalIntDomain(),                 // end
 		    IntervalIntDomain(1, PLUS_INFINITY), // duration
 		    Token::noObject(),                   // Object Name
-		    false)
-  {
-    commonInit(body, close);
-    debugMsg("Interpreter:InterpretedToken","Created slave token(" << getKey() << ") of type:" << predicateName.toString() << " objectVar=" << getVariable("object")->toString());
-  }
+		    false) {
+  commonInit(body, _close);
+  debugMsg("Interpreter:InterpretedToken",
+           "Created slave token(" << getKey() << ") of type:" << 
+           predicateName << " objectVar=" << 
+           getVariable("object")->toString());
+}
 
   InterpretedToken::~InterpretedToken()
   {
@@ -1274,23 +1291,22 @@ namespace EUROPA {
   /*
    * InterpretedTokenType
    */
-    InterpretedTokenType::InterpretedTokenType(
-            const ObjectTypeId& ot,
-            const LabelStr& predicateName,
-            const std::string& kind)
-        : TokenType(ot,predicateName)
-    {
-    	// TODO: offer conversion methods in TokenType
-    	int attributes=0;
-    	if (kind=="action")
-    		attributes |= PSTokenType::ACTION;
-    	else if (kind=="predicate")
-    		attributes |= PSTokenType::PREDICATE;
-    	else
-    		std::cerr << "TokenType "<< predicateName.toString() << " unknown kind:" << kind << std::endl;
+InterpretedTokenType::InterpretedTokenType(
+    const ObjectTypeId ot,
+    const std::string& predicateName,
+    const std::string& kind)
+    : TokenType(ot,predicateName), m_body(), m_rules() {
+  // TODO: offer conversion methods in TokenType
+  int attributes=0;
+  if (kind=="action")
+    attributes |= PSTokenType::ACTION;
+  else if (kind=="predicate")
+    attributes |= PSTokenType::PREDICATE;
+  else
+    std::cerr << "TokenType "<< predicateName << " unknown kind:" << kind << std::endl;
 
-    	addAttributes(attributes);
-    }
+  addAttributes(attributes);
+}
 
     void InterpretedTokenType::addBodyExpr(Expr* e)
     {
@@ -1323,7 +1339,7 @@ namespace EUROPA {
 	er->populateCausality( this );
     }
 
-    TokenTypeId InterpretedTokenType::getParentType(const PlanDatabaseId& planDb) const
+    TokenTypeId InterpretedTokenType::getParentType(const PlanDatabaseId planDb) const
     {
         // TODO: cache this?
         // TODO: drop planDb parameter, ObjectType must be able to answer this without reference to schema
@@ -1336,64 +1352,65 @@ namespace EUROPA {
      * this method takes advantage of that hack to pass the original type up the class hierarchy
      * a cleaner implementation that explicitly keeps track of the original token type is needed
      */
-    TokenId InterpretedTokenType::createInstance(const PlanDatabaseId& planDb, const LabelStr& name, bool rejectable, bool isFact) const
-	{
-	    TokenTypeId parentType = getParentType(planDb);
+TokenId InterpretedTokenType::createInstance(const PlanDatabaseId planDb,
+                                             const std::string& name, bool rejectable,
+                                             bool isFact) const {
+  TokenTypeId parentType = getParentType(planDb);
 
-        TokenId token;
-	    if (parentType.isNoId()) {
-	        token = (new InterpretedToken(
-	                planDb,
-	                name, // Hack! this should be original TokenType passed explicitly
-	                m_body,
-	                rejectable,
-	                isFact,
-	                false))->getId();
-	        // TODO: this should be done for NativeTokens as well
-	        token->setAttributes(getAttributes());
-	    }
-	    else {
-	        token = parentType->createInstance(planDb,name,rejectable,isFact);
-            InterpretedToken* it = dynamic_cast<InterpretedToken*>((Token*)token);
-            if (it != NULL)
-            	it->commonInit(m_body,false);
-	    }
-
-	    return token;
-	}
-
-  TokenId InterpretedTokenType::createInstance(const TokenId& master, const LabelStr& name, const LabelStr& relation) const
-  {
-      TokenTypeId parentType = getParentType(master->getPlanDatabase());
-
-      TokenId token;
-      if (parentType.isNoId()) {
-          token = (new InterpretedToken(
-                  master,
-                  name,
-                  relation,
-                  m_body,
-                  false))->getId();
-	        // TODO: this should be done for all tokens, not just InterpretedTokens
-	        token->setAttributes(getAttributes());
-      }
-      else {
-          token = parentType->createInstance(master,name,relation);
-          // TODO: Hack! this makes it impossible to extend native tokens
-          // class hierarchy needs to be fixed to avoid this cast
-          InterpretedToken* it = dynamic_cast<InterpretedToken*>((Token*)token);
-          it->commonInit(m_body,false);
-      }
-
-      return token;
+  TokenId token;
+  if (parentType.isNoId()) {
+    token = (new InterpretedToken(
+        planDb,
+        name, // Hack! this should be original TokenType passed explicitly
+        m_body,
+        rejectable,
+        isFact,
+        false))->getId();
+    // TODO: this should be done for NativeTokens as well
+    token->setAttributes(getAttributes());
   }
+  else {
+    token = parentType->createInstance(planDb,name,rejectable,isFact);
+    InterpretedToken* it = id_cast<InterpretedToken>(token);
+    if (it != NULL)
+      it->commonInit(m_body,false);
+  }
+
+  return token;
+}
+
+TokenId InterpretedTokenType::createInstance(const TokenId master, const std::string& name,
+                                             const std::string& relation) const {
+  TokenTypeId parentType = getParentType(master->getPlanDatabase());
+
+  TokenId token;
+  if (parentType.isNoId()) {
+    token = (new InterpretedToken(
+        master,
+        name,
+        relation,
+        m_body,
+        false))->getId();
+    // TODO: this should be done for all tokens, not just InterpretedTokens
+    token->setAttributes(getAttributes());
+  }
+  else {
+    token = parentType->createInstance(master,name,relation);
+    // TODO: Hack! this makes it impossible to extend native tokens
+    // class hierarchy needs to be fixed to avoid this cast
+    InterpretedToken* it = id_cast<InterpretedToken>(token);
+    it->commonInit(m_body,false);
+  }
+
+  return token;
+}
 
 
   /*
    * RuleInstanceEvalContext
    * Puts RuleInstance variables like duration, start, end, in context
    */
-  RuleInstanceEvalContext::RuleInstanceEvalContext(EvalContext* parent, const InterpretedRuleInstanceId& ruleInstance)
+  RuleInstanceEvalContext::RuleInstanceEvalContext(EvalContext* parent, const InterpretedRuleInstanceId ruleInstance)
     : EvalContext(parent)
     , m_ruleInstance(ruleInstance)
   {
@@ -1403,49 +1420,45 @@ namespace EUROPA {
   {
   }
 
-  void* RuleInstanceEvalContext::getElement(const char* name) const
+  void* RuleInstanceEvalContext::getElement(const std::string& name) const
   {
       std::string str(name);
       if (str == "RuleInstance")
-          return (InterpretedRuleInstance*)m_ruleInstance;
+        return static_cast<InterpretedRuleInstance*>(m_ruleInstance);
       if (str == "PlanDatabase")
-          return (PlanDatabase*)m_ruleInstance->getPlanDatabase();
+        return static_cast<PlanDatabase*>(m_ruleInstance->getPlanDatabase());
 
       return EvalContext::getElement(name);
   }
 
-  ConstrainedVariableId RuleInstanceEvalContext::getVar(const char* name)
-  {
-    ConstrainedVariableId var = m_ruleInstance->getVariable(LabelStr(name));
+ConstrainedVariableId RuleInstanceEvalContext::getVar(const std::string& name) {
+  ConstrainedVariableId var = m_ruleInstance->getVariable(name);
 
-    if (!var.isNoId()) {
-      debugMsg("Interpreter:EvalContext:RuleInstance","Found var in rule instance:" << name);
-      return var;
-    }
-    else {
-      debugMsg("Interpreter:EvalContext:RuleInstance","Didn't find var in rule instance:" << name);
-      return EvalContext::getVar(name);
-    }
+  if (!var.isNoId()) {
+    debugMsg("Interpreter:EvalContext:RuleInstance","Found var in rule instance:" << name);
+    return var;
   }
+  else {
+    debugMsg("Interpreter:EvalContext:RuleInstance","Didn't find var in rule instance:" << name);
+    return EvalContext::getVar(name);
+  }
+}
 
-  TokenId RuleInstanceEvalContext::getToken(const char* name)
-  {
-	  LabelStr ls_name(name);
-      TokenId tok = m_ruleInstance->getSlave(ls_name);
-      if (!tok.isNoId()) {
-          debugMsg("Interpreter:EvalContext:RuleInstance","Found token in rule instance:" << name);
-          return tok;
-      }
-      else {
-        debugMsg("Interpreter:EvalContext:RuleInstance","Didn't find token in rule instance:" << name);
-        return EvalContext::getToken(name);
-      }
+TokenId RuleInstanceEvalContext::getToken(const std::string& name) {
+  TokenId tok = m_ruleInstance->getSlave(name);
+  if (!tok.isNoId()) {
+    debugMsg("Interpreter:EvalContext:RuleInstance","Found token in rule instance:" << name);
+    return tok;
   }
+  else {
+    debugMsg("Interpreter:EvalContext:RuleInstance","Didn't find token in rule instance:" << name);
+    return EvalContext::getToken(name);
+  }
+}
 
-  bool RuleInstanceEvalContext::isClass(const LabelStr& className) const
-  {
-     return m_ruleInstance->getPlanDatabase()->getSchema()->isObjectType(className);
-  }
+bool RuleInstanceEvalContext::isClass(const std::string& className) const {
+  return m_ruleInstance->getPlanDatabase()->getSchema()->isObjectType(className);
+}
 
   std::string RuleInstanceEvalContext::toString() const
   {
@@ -1457,7 +1470,7 @@ namespace EUROPA {
     const std::vector<ConstrainedVariableId>& vars = m_ruleInstance->getToken()->getVariables();
     for(std::vector<ConstrainedVariableId>::const_iterator it = vars.begin(); it != vars.end(); ++it){
       ConstrainedVariableId var = *it;
-      os << var->getName().toString() << "," ;
+      os << var->getName() << "," ;
     }
     os << "}" << std::endl;
 
@@ -1468,7 +1481,7 @@ namespace EUROPA {
    * RuleInstanceEvalContext
    * Puts Token variables like duration, start, end, in context
    */
-  TokenEvalContext::TokenEvalContext(EvalContext* parent, const TokenId& token)
+  TokenEvalContext::TokenEvalContext(EvalContext* parent, const TokenId token)
     : EvalContext(parent)
     , m_token(token)
   {
@@ -1478,43 +1491,41 @@ namespace EUROPA {
   {
   }
 
-  TokenId& TokenEvalContext::getToken() { return m_token; }
+TokenId TokenEvalContext::getToken() { return m_token; }
+TokenId TokenEvalContext::getToken(const std::string&) { return m_token; }
 
-  ConstrainedVariableId TokenEvalContext::getVar(const char* name)
-  {
-    ConstrainedVariableId var = m_token->getVariable(LabelStr(name));
+ConstrainedVariableId TokenEvalContext::getVar(const std::string& name) {
+  ConstrainedVariableId var = m_token->getVariable(name);
 
-    if (!var.isNoId()) {
-      debugMsg("Interpreter:EvalContext:Token","Found var in token :" << name);
-      return var;
-    }
-    else
-      return EvalContext::getVar(name);
+  if (!var.isNoId()) {
+    debugMsg("Interpreter:EvalContext:Token","Found var in token :" << name);
+    return var;
   }
+  else
+    return EvalContext::getVar(name);
+}
 
-  void* TokenEvalContext::getElement(const char* name) const
-  {
-      std::string str(name);
-      if (str == "Token")
-          return (Token*)m_token;
-      if (str == "PlanDatabase")
-          return (PlanDatabase*)m_token->getPlanDatabase();
+void* TokenEvalContext::getElement(const std::string& name) const {
+  std::string str(name);
+  if (str == "Token")
+    return static_cast<Token*>(m_token);
+  if (str == "PlanDatabase")
+    return static_cast<PlanDatabase*>(m_token->getPlanDatabase());
 
-      return EvalContext::getElement(name);
-  }
+  return EvalContext::getElement(name);
+}
 
 
-  bool TokenEvalContext::isClass(const LabelStr& className) const
-  {
-     return m_token->getPlanDatabase()->getSchema()->isObjectType(className);
-  }
+bool TokenEvalContext::isClass(const std::string& className) const {
+  return m_token->getPlanDatabase()->getSchema()->isObjectType(className);
+}
 
   /*
    * InterpretedRuleInstance
    */
-  InterpretedRuleInstance::InterpretedRuleInstance(const RuleId& rule,
-						   const TokenId& token,
-						   const PlanDatabaseId& planDb,
+  InterpretedRuleInstance::InterpretedRuleInstance(const RuleId rule,
+						   const TokenId token,
+						   const PlanDatabaseId planDb,
 						   const std::vector<Expr*>& body)
     : RuleInstance(rule, token, planDb)
     , m_body(body)
@@ -1522,8 +1533,8 @@ namespace EUROPA {
   }
 
   InterpretedRuleInstance::InterpretedRuleInstance(
-						   const RuleInstanceId& parent,
-						   const ConstrainedVariableId& var,
+						   const RuleInstanceId parent,
+						   const ConstrainedVariableId var,
 						   const Domain& domain,
 						   const bool positive,
 						   const std::vector<Expr*>& body)
@@ -1532,8 +1543,8 @@ namespace EUROPA {
   {
   }
 
-InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
-                                                 const ConstrainedVariableId& var,
+InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId parent,
+                                                 const ConstrainedVariableId var,
                                                  const Domain& domain,
                                                  const bool positive,
                                                  const std::vector<ConstrainedVariableId>& guardComponents,
@@ -1544,7 +1555,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   }
 
   InterpretedRuleInstance::InterpretedRuleInstance(
-						   const RuleInstanceId& parent,
+						   const RuleInstanceId parent,
 						   const std::vector<ConstrainedVariableId>& vars,
 						   const bool positive,
 						   const std::vector<Expr*>& body)
@@ -1565,7 +1576,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
     RuleInstanceEvalContext evalContext(NULL,getId());
 
     debugMsg("Interpreter:InterpretedRule",
-	     "Executing interpreted rule: " << getRule()->getName().toString() << ":" <<  getRule()->getSource().toString() <<
+	     "Executing interpreted rule: " << getRule()->getName() << ":" <<  getRule()->getSource() <<
 	     "token: " << m_token->toString());
 
     for(std::vector<Expr*>::const_iterator it = m_body.begin(); it != m_body.end(); ++it) {
@@ -1578,160 +1589,153 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
     }
 
     debugMsg("Interpreter:InterpretedRule",
-	     "Executed interpreted rule: " << getRule()->getName().toString() << ":" <<  getRule()->getSource().toString() <<
+	     "Executed interpreted rule: " << getRule()->getName() << ":" <<  getRule()->getSource() <<
 	     "token: " << m_token->toString());
   }
 
-  TokenId InterpretedRuleInstance::createSubgoal(
-						 const LabelStr& name,
-						 const LabelStr& predicateType,
-						 const LabelStr& predicateInstance,
-						 const LabelStr& relation,
-						 bool isConstrained,
-						 ConstrainedVariableId& owner)
-  {
-    TokenId slave;
+TokenId InterpretedRuleInstance::createSubgoal(const std::string& name,
+                                               const std::string& predicateType,
+                                               const std::string& predicateInstance,
+                                               const std::string& relation,
+                                               bool isConstrained,
+                                               ConstrainedVariableId owner) {
+  TokenId slave;
 
-    unsigned int tokenCnt = predicateInstance.countElements(".");
-    bool isOnSameObject = (
-        tokenCnt == 1 ||
-        (tokenCnt==2 && (predicateInstance.getElement(0,".").toString() == "object"))
-    );
+  unsigned long tokenCnt =
+      std::count(predicateInstance.begin(), predicateInstance.end(), '.') + 1;
+  bool isOnSameObject = (
+      tokenCnt == 1 ||
+      (tokenCnt==2 && (predicateInstance.substr(0,predicateInstance.find('.')) == "object"))
+                         );
 
-    if (isOnSameObject) {
-        // TODO: this is to support predicate inheritance
-      	// currently doing the same as the compiler, it'll probably be surprising to the user that
-      	// predicate inheritance will work only if the predicates are on the same object that the rule belongs to
-      	LabelStr suffix = predicateInstance.getElement(tokenCnt-1,".");
-        slave = NDDL::allocateOnSameObject(m_token,suffix,relation);
+  if (isOnSameObject) {
+    // TODO: this is to support predicate inheritance
+    // currently doing the same as the compiler, it'll probably be surprising to the user that
+    // predicate inheritance will work only if the predicates are on the same object that the rule belongs to
+    std::string suffix = predicateInstance.substr(predicateInstance.rfind('.') + 1);
+    slave = NDDL::allocateOnSameObject(m_token,suffix,relation);
+  }
+  else {
+    slave = m_token->getPlanDatabase()->createSlaveToken(m_token,predicateType,relation);
+  }
+  addSlave(slave,name);
+
+  // For qualified names like "object.helloWorld" must add constraint to the object variable on the slave token
+  // See RuleWriter.allocateSlave in Nddl compiler
+  if (isConstrained) {
+    std::vector<ConstrainedVariableId> vars;
+
+    if (tokenCnt <= 2) {
+      vars.push_back(owner);
     }
-    else {
-        slave = m_token->getPlanDatabase()->createSlaveToken(m_token,predicateType,relation);
-    }
-    addSlave(slave,name);
-
-    // For qualified names like "object.helloWorld" must add constraint to the object variable on the slave token
-    // See RuleWriter.allocateSlave in Nddl compiler
-    if (isConstrained) {
-      std::vector<ConstrainedVariableId> vars;
-
-      if (tokenCnt <= 2) {
-          vars.push_back(owner);
-      }
-      else {  // equivalent of constrainObject() in NddlRules.hh
-          // TODO: this can be done more efficiently
-          int cnt = predicateInstance.countElements(".");
-          std::string ownerName(predicateInstance.getElement(0,".").toString());
-          std::string tokenName(predicateInstance.getElement(cnt-1,".").toString());
-          std::string fullName = predicateInstance.toString();
-          std::string objectPath = fullName.substr(
-                  ownerName.size()+1,
-                  fullName.size()-(ownerName.size()+tokenName.size()+2)
-          );
-          debugMsg("Interpreter:InterpretedRule","Subgoal slave object constraint. fullName=" << fullName << " owner=" << ownerName << " objPath=" << objectPath << " tokenName=" << tokenName);
-          vars.push_back(varFromObject(owner,objectPath,fullName));
-      }
-
-      vars.push_back(slave->getObject());
-      addConstraint(LabelStr("eq"),vars);
-    }
-    else {
-      debugMsg("Interpreter:InterpretedRule",predicateInstance.toString() << " NotConstrained");
+    else {  // equivalent of constrainObject() in NddlRules.hh
+      // TODO: this can be done more efficiently
+      std::string ownerName(predicateInstance.substr(0, predicateInstance.find('.')));
+      std::string tokenName(predicateInstance.substr(predicateInstance.rfind('.') + 1));
+      std::string fullName = predicateInstance;
+      std::string objectPath = fullName.substr(
+          ownerName.size()+1,
+          fullName.size()-(ownerName.size()+tokenName.size()+2)
+                                               );
+      debugMsg("Interpreter:InterpretedRule","Subgoal slave object constraint. fullName=" << fullName << " owner=" << ownerName << " objPath=" << objectPath << " tokenName=" << tokenName);
+      vars.push_back(varFromObject(owner,objectPath,fullName));
     }
 
-    return slave;
+    vars.push_back(slave->getObject());
+    addConstraint("eq",vars);
+  }
+  else {
+    debugMsg("Interpreter:InterpretedRule",predicateInstance << " NotConstrained");
   }
 
-  ConstrainedVariableId InterpretedRuleInstance::addLocalVariable(
-								  const Domain& baseDomain,
-								  bool canBeSpecified,
-								  const LabelStr& name)
+  return slave;
+}
+
+ConstrainedVariableId InterpretedRuleInstance::addLocalVariable(const Domain& baseDomain,
+                                                                bool canBeSpecified,
+                                                                const std::string& name) {
+  return addVariable(baseDomain,canBeSpecified,name);
+}
+
+ConstrainedVariableId InterpretedRuleInstance::addObjectVariable(const std::string& type,
+                                                                 const ObjectDomain& baseDomain,
+                                                                 bool canBeSpecified,
+                                                                 const std::string& name) {
+  ConstrainedVariableId localVariable = addVariable(baseDomain,canBeSpecified,name);
+  getPlanDatabase()->makeObjectVariableFromType(type,localVariable);
+
+  return localVariable;
+}
+
+void InterpretedRuleInstance::executeLoop(EvalContext& evalContext,
+                                          const std::string& loopVarName,
+                                          const std::string& valueSet,
+                                          const std::vector<Expr*>& loopBody) {
+  // Create a local domain based on the objects included in the valueSet
+  ConstrainedVariableId setVar = evalContext.getVar(valueSet.c_str());
+  check_error(!setVar.isNoId(),"Loop var can't be NULL");
+  const Domain& setVarDomain = setVar->derivedDomain();
+  debugMsg("Interpreter:InterpretedRule","set var for loop :" << setVar->toString());
+  debugMsg("Interpreter:InterpretedRule","set var domain for loop:" << setVarDomain.toString());
+  const ObjectDomain& loopObjectSet = dynamic_cast<const ObjectDomain&>(setVarDomain);
+
+  if (loopObjectSet.isEmpty())
+    return; // we're done
+
+  // The lock is an assert check really
   {
-    return addVariable(baseDomain,canBeSpecified,name);
+    std::vector<ConstrainedVariableId> loop_vars;
+    loop_vars.push_back(setVar);
+    loop_vars.push_back(ruleVariable(loopObjectSet));
+    rule_constraint(filterLock, loop_vars);
+  }
+  std::list<edouble> loopObjectSet_values;
+  loopObjectSet.getValues(loopObjectSet_values);
+
+  // Translate into a set ordered by key to ensure reliable ordering across runs
+  ObjectSet loopObjectSet_valuesByKey;
+  for(std::list<edouble>::iterator it=loopObjectSet_values.begin();
+      it!=loopObjectSet_values.end(); ++it) {
+    ObjectId t = Entity::getTypedEntity<Object>(*it);
+    loopObjectSet_valuesByKey.insert(t);
   }
 
-  ConstrainedVariableId InterpretedRuleInstance::addObjectVariable(
-								   const LabelStr& type,
-								   const ObjectDomain& baseDomain,
-								   bool canBeSpecified,
-								   const LabelStr& name)
-  {
-    ConstrainedVariableId localVariable = addVariable(baseDomain,canBeSpecified,name);
-    getPlanDatabase()->makeObjectVariableFromType(type,localVariable);
+  // iterate over loop collection
+  for(ObjectSet::const_iterator it=loopObjectSet_valuesByKey.begin()
+          ;it!=loopObjectSet_valuesByKey.end(); ++it) {
+    ObjectId loop_var = *it;
+    check_error(loop_var.isValid());
 
-    return localVariable;
-  }
-
-  void InterpretedRuleInstance::executeLoop(EvalContext& evalContext,
-					    const LabelStr& loopVarName,
-					    const LabelStr& valueSet,
-					    const std::vector<Expr*>& loopBody)
-  {
-    // Create a local domain based on the objects included in the valueSet
-    ConstrainedVariableId setVar = evalContext.getVar(valueSet.c_str());
-    check_error(!setVar.isNoId(),"Loop var can't be NULL");
-    const Domain& setVarDomain = setVar->derivedDomain();
-    debugMsg("Interpreter:InterpretedRule","set var for loop :" << setVar->toString());
-    debugMsg("Interpreter:InterpretedRule","set var domain for loop:" << setVarDomain.toString());
-    const ObjectDomain& loopObjectSet = dynamic_cast<const ObjectDomain&>(setVarDomain);
-
-    if (loopObjectSet.isEmpty())
-    	return; // we're done
-
-    // The lock is an assert check really
+    // Allocate a local variable for this singleton object
+    // see loopVar(Allocation, a);
     {
-    	std::vector<ConstrainedVariableId> loop_vars;
-    	loop_vars.push_back(setVar);
-    	loop_vars.push_back(ruleVariable(loopObjectSet));
-    	rule_constraint(filterLock, loop_vars);
-    }
-    std::list<edouble> loopObjectSet_values;
-    loopObjectSet.getValues(loopObjectSet_values);
-
-    // Translate into a set ordered by key to ensure reliable ordering across runs
-    ObjectSet loopObjectSet_valuesByKey;
-    for(std::list<edouble>::iterator it=loopObjectSet_values.begin();
-        it!=loopObjectSet_values.end(); ++it) {
-      ObjectId t = Entity::getTypedEntity<Object>(*it);
-      loopObjectSet_valuesByKey.insert(t);
+      ObjectDomain loopVarDomain(setVarDomain.getDataType());
+      loopVarDomain.insert(loop_var->getKey());
+      loopVarDomain.close();
+      // This will automatically put it in the evalContext, since all RuleInstance vars are reachable there
+      addVariable(loopVarDomain, false, loopVarName);
     }
 
-    // iterate over loop collection
-    for(ObjectSet::const_iterator it=loopObjectSet_valuesByKey.begin()
-    		;it!=loopObjectSet_valuesByKey.end(); ++it) {
-    	ObjectId loop_var = *it;
-    	check_error(loop_var.isValid());
+    // execute loop body
+    for (unsigned int i=0; i < loopBody.size(); i++)
+      loopBody[i]->eval(evalContext);
 
-    	// Allocate a local variable for this singleton object
-    	// see loopVar(Allocation, a);
-    	{
-    		ObjectDomain loopVarDomain(setVarDomain.getDataType());
-    		loopVarDomain.insert(loop_var->getKey());
-    		loopVarDomain.close();
-    		// This will automatically put it in the evalContext, since all RuleInstance vars are reachable there
-    		addVariable(loopVarDomain, false, loopVarName);
-    	}
-
-        // execute loop body
-    	for (unsigned int i=0; i < loopBody.size(); i++)
-    		loopBody[i]->eval(evalContext);
-
-    	clearLoopVar(loopVarName);
-    }
+    clearLoopVar(loopVarName);
   }
+}
 
 
   /*
    * InterpretedRuleFactory
    */
-  InterpretedRuleFactory::InterpretedRuleFactory(const LabelStr& predicate,
-						 const LabelStr& source,
-						 const std::vector<Expr*>& body)
+InterpretedRuleFactory::InterpretedRuleFactory(const std::string& predicate,
+                                               const std::string& source,
+                                               const std::vector<Expr*>& body)
     : Rule(predicate,source)
     , m_body(body)
   {
     debugMsg("InterpretedRuleFactory:InterpretedRuleFactory",
-	     "Instantiating rule for " << source.toString());
+	     "Instantiating rule for " << source);
     for(std::vector<Expr*>::const_iterator it = body.begin(); it != body.end(); ++it) {
       debugMsg("InterpretedRuleFactory:InterpretedRuleFactory",
 	       (*it)->toString());
@@ -1747,8 +1751,8 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   }
 
   RuleInstanceId InterpretedRuleFactory::createInstance(
-							const TokenId& token,
-							const PlanDatabaseId& planDb,
+							const TokenId token,
+							const PlanDatabaseId planDb,
 							const RulesEngineId &rulesEngine) const
   {
     InterpretedRuleInstance *foo = new InterpretedRuleInstance(m_id, token, planDb, m_body);
@@ -1761,7 +1765,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
 	  return m_body;
   }
 
-  ExprTypedef::ExprTypedef(const DataTypeId& baseType, const char* name, Domain* baseDomain)
+  ExprTypedef::ExprTypedef(const DataTypeId baseType, const std::string& name, Domain* baseDomain)
       : m_baseType(baseType)
       , m_name(name)
       , m_baseDomain(baseDomain)
@@ -1775,7 +1779,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
 
   DataRef ExprTypedef::eval(EvalContext& context) const
   {
-      const char* name = m_name.c_str();
+      const std::string& name = m_name.c_str();
       const Domain& domain = *m_baseDomain;
 
       debugMsg("Interpreter:typedef","Defining type:" << name);
@@ -1801,12 +1805,12 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   {
       std::ostringstream os;
 
-      os << "TYPEDEF:" << m_baseType->getName().toString() << " -> " << m_name.toString();
+      os << "TYPEDEF:" << m_baseType->getName() << " -> " << m_name;
 
       return os.str();
   }
 
-  ExprEnumdef::ExprEnumdef(const char* name, const std::vector<std::string>& values)
+  ExprEnumdef::ExprEnumdef(const std::string& name, const std::vector<LabelStr>& values)
       : m_name(name)
       , m_values(values)
   {
@@ -1816,44 +1820,42 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   {
   }
 
-  DataRef ExprEnumdef::eval(EvalContext& context) const
-  {
-      const char* enumName = m_name.c_str();
-      // TODO: hack! drop this after Core.nddl goes away
-      if (strcmp(enumName,"TokenStates") == 0) {
-          debugMsg("Interpreter:defineEnumeration","Ignoring redefinition for TokenStates enum");
-          return DataRef::null;
-      }
-
-      debugMsg("Interpreter:enumdef","Defining enum:" << enumName);
-
-      std::list<edouble> values;
-      for(unsigned int i=0;i<m_values.size();i++) {
-          LabelStr newValue(m_values[i]);
-          values.push_back(newValue);
-      }
-      EnumeratedDomain domain(SymbolDT::instance(),values);
-
-      SchemaId schema = getSchema(context);
-      schema->registerEnum(enumName,domain);
-
-      debugMsg("Interpreter:enumdef"
-              , "Created type factory " << enumName <<
-              " with base domain " << domain.toString());
-
-      return DataRef::null;
+DataRef ExprEnumdef::eval(EvalContext& context) const {
+  const std::string& enumName = m_name;
+  // TODO: hack! drop this after Core.nddl goes away
+  if (enumName == "TokenStates") {
+    debugMsg("Interpreter:defineEnumeration","Ignoring redefinition for TokenStates enum");
+    return DataRef::null;
   }
+
+  debugMsg("Interpreter:enumdef","Defining enum:" << enumName);
+
+
+  std::list<edouble> values;
+  std::copy(m_values.begin(), m_values.end(), std::back_inserter(values));
+
+  EnumeratedDomain domain(SymbolDT::instance(),values);
+
+  SchemaId schema = getSchema(context);
+  schema->registerEnum(enumName,domain);
+
+  debugMsg("Interpreter:enumdef"
+           , "Created type factory " << enumName <<
+           " with base domain " << domain.toString());
+
+  return DataRef::null;
+}
 
   std::string ExprEnumdef::toString() const
   {
       std::ostringstream os;
 
-      os << "ENUMDEF:" << m_name.toString();
+      os << "ENUMDEF:" << m_name;
 
       return os.str();
   }
 
-  ExprVarDeclaration::ExprVarDeclaration(const char* name, const DataTypeId& type, Expr* initValue, bool canBeSpecified)
+  ExprVarDeclaration::ExprVarDeclaration(const std::string& name, const DataTypeId type, Expr* initValue, bool canBeSpecified)
       : m_name(name)
       , m_type(type)
       , m_initValue(initValue)
@@ -1867,7 +1869,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
           delete m_initValue;
   }
 
-  const LabelStr& ExprVarDeclaration::getName() const { return m_name; }
+const std::string& ExprVarDeclaration::getName() const { return m_name; }
   const DataTypeId ExprVarDeclaration::getDataType() const { return m_type; }
   const Expr* ExprVarDeclaration::getInitValue() const { return m_initValue; }
   void ExprVarDeclaration::setInitValue(Expr* iv) { m_initValue = iv; }
@@ -1892,120 +1894,117 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return DataRef(v);
   }
 
-  ConstrainedVariableId ExprVarDeclaration::makeGlobalVar(EvalContext& context) const
-  {
-      const LabelStr& name = getName();
-      const LabelStr& type = getDataType()->getName();
-      const Expr* initValue = getInitValue();
-      const DbClientId& pdb = getPDB(context);
+ConstrainedVariableId ExprVarDeclaration::makeGlobalVar(EvalContext& context) const {
+  const std::string& name = getName();
+  const std::string& type = getDataType()->getName();
+  const Expr* initValue = getInitValue();
+  const DbClientId pdb = getPDB(context);
 
-      ConstrainedVariableId v;
+  ConstrainedVariableId v;
 
-      if (initValue != NULL) {
-          v = pdb->createVariable(
-              type.c_str(),
-              initValue->eval(context).getValue()->baseDomain(), // baseDomain
-              name.c_str(),
-              false, // isTmpVar
-              m_canBeSpecified
-          );
-      }
-      else {
-          v = pdb->createVariable(
-              type.c_str(),
-              name.c_str()
-          );
-      }
-
-      return v;
+  if (initValue != NULL) {
+    v = pdb->createVariable(
+        type.c_str(),
+        initValue->eval(context).getValue()->baseDomain(), // baseDomain
+        name.c_str(),
+        false, // isTmpVar
+        m_canBeSpecified
+                            );
+  }
+  else {
+    v = pdb->createVariable(
+        type.c_str(),
+        name.c_str()
+                            );
   }
 
-  ConstrainedVariableId ExprVarDeclaration::makeTokenVar(TokenEvalContext& context) const
-  {
-      const LabelStr& parameterName = getName();
-      const LabelStr& parameterType = getDataType()->getName();
-      const Expr* initValue = getInitValue();
-      TokenId token=context.getToken();
+  return v;
+}
 
-      check_runtime_error(token->getVariable(parameterName,false) == ConstrainedVariableId::noId(),
-                          "Token parameter "+parameterName.toString()+ " already exists!");
+ConstrainedVariableId ExprVarDeclaration::makeTokenVar(TokenEvalContext& context) const {
+  const std::string& parameterName = getName();
+  const std::string& parameterType = getDataType()->getName();
+  const Expr* initValue = getInitValue();
+  TokenId token=context.getToken();
 
-      // This is a hack needed because TokenVariable is parametrized by the domain arg to addParameter
-      ConstrainedVariableId parameter;
-      const DataTypeId& parameterDataType = getDataType();
+  check_runtime_error(token->getVariable(parameterName,false) == ConstrainedVariableId::noId(),
+                      "Token parameter "+parameterName+ " already exists!");
 
-      // same as completeObjectParam in NddlRules.hh
-      if(initValue != NULL) {
-          Domain* bd = parameterDataType->baseDomain().copy();
-          ConstrainedVariableId rhs = initValue->eval(context).getValue();
-          bd->intersect(rhs->lastDomain());
-          parameter = token->addParameter(
-                  *bd,
-                  parameterName
-          );
-          delete bd;
-          if (context.isClass(parameterName))
-              token->getPlanDatabase()->makeObjectVariableFromType(parameterType, parameter);
-      }
-      else {
-          if (context.isClass(parameterType)) {
-              parameter = token->addParameter(
-                      ObjectDomain(parameterDataType),
-                      parameterName
-              );
-              token->getPlanDatabase()->makeObjectVariableFromType(parameterType, parameter);
-          }
-          else {
-              parameter = token->addParameter(
-                      parameterDataType->baseDomain(),
-                      parameterName
-              );
-          }
-      }
+  // This is a hack needed because TokenVariable is parametrized by the domain arg to addParameter
+  ConstrainedVariableId parameter;
+  const DataTypeId parameterDataType = getDataType();
 
-      debugMsg("Interpreter:InterpretedToken","Token " << token->getPredicateName().toString() << " added Parameter "
-              << parameter->toString() << " " << parameterName.toString());
-
-      return parameter;
+  // same as completeObjectParam in NddlRules.hh
+  if(initValue != NULL) {
+    Domain* bd = parameterDataType->baseDomain().copy();
+    ConstrainedVariableId rhs = initValue->eval(context).getValue();
+    bd->intersect(rhs->lastDomain());
+    parameter = token->addParameter(
+        *bd,
+        parameterName
+                                    );
+    delete bd;
+    if (context.isClass(parameterName))
+      token->getPlanDatabase()->makeObjectVariableFromType(parameterType, parameter);
+  }
+  else {
+    if (context.isClass(parameterType)) {
+      parameter = token->addParameter(
+          ObjectDomain(parameterDataType),
+          parameterName
+                                      );
+      token->getPlanDatabase()->makeObjectVariableFromType(parameterType, parameter);
+    }
+    else {
+      parameter = token->addParameter(
+          parameterDataType->baseDomain(),
+          parameterName
+                                      );
+    }
   }
 
-  ConstrainedVariableId ExprVarDeclaration::makeRuleVar(RuleInstanceEvalContext& context) const
-  {
-	  const LabelStr typeName = getDataType()->getName();
+  debugMsg("Interpreter:InterpretedToken","Token " << token->getPredicateName() << " added Parameter "
+           << parameter->toString() << " " << parameterName);
 
-	  ConstrainedVariableId localVar;
-	  if (context.isClass(typeName)) {
-		  const DataTypeId& dt = context.getRuleInstance()->getPlanDatabase()->getSchema()->getCESchema()->getDataType(typeName.c_str());
-		  localVar = context.getRuleInstance()->addObjectVariable(
-				  getDataType()->getName(),
-				  ObjectDomain(dt),
-				  m_canBeSpecified,
-				  m_name
-		  );
-	  }
-	  else {
-		  // TODO: do we really need to pass the base domain?
-				  const Domain& baseDomain = context.getRuleInstance()->getPlanDatabase()->getSchema()->getCESchema()->baseDomain(typeName.c_str());
-				  localVar = context.getRuleInstance()->addLocalVariable(
-						  baseDomain,
-						  m_canBeSpecified,
-						  m_name
-				  );
-	  }
+  return parameter;
+}
 
-	  if (m_initValue != NULL)
-		  localVar->restrictBaseDomain(m_initValue->eval(context).getValue()->derivedDomain());
+ConstrainedVariableId ExprVarDeclaration::makeRuleVar(RuleInstanceEvalContext& context) const {
+  const std::string typeName = getDataType()->getName();
 
-	  context.addVar(m_name.c_str(),localVar);
-	  debugMsg("Interpreter:InterpretedRule","Added RuleInstance local var:" << localVar->toLongString());
-	  return localVar;
+  ConstrainedVariableId localVar;
+  if (context.isClass(typeName)) {
+    const DataTypeId dt = context.getRuleInstance()->getPlanDatabase()->getSchema()->getCESchema()->getDataType(typeName.c_str());
+    localVar = context.getRuleInstance()->addObjectVariable(
+        getDataType()->getName(),
+        ObjectDomain(dt),
+        m_canBeSpecified,
+        m_name
+                                                            );
   }
+  else {
+    // TODO: do we really need to pass the base domain?
+    const Domain& baseDomain = context.getRuleInstance()->getPlanDatabase()->getSchema()->getCESchema()->baseDomain(typeName.c_str());
+    localVar = context.getRuleInstance()->addLocalVariable(
+        baseDomain,
+        m_canBeSpecified,
+        m_name
+                                                           );
+  }
+
+  if (m_initValue != NULL)
+    localVar->restrictBaseDomain(m_initValue->eval(context).getValue()->derivedDomain());
+
+  context.addVar(m_name.c_str(),localVar);
+  debugMsg("Interpreter:InterpretedRule","Added RuleInstance local var:" << localVar->toLongString());
+  return localVar;
+}
 
   std::string ExprVarDeclaration::toString() const
   {
       std::ostringstream os;
 
-      os << m_type->getName().c_str() << " " << m_name.toString();
+      os << m_type->getName().c_str() << " " << m_name;
       if (m_initValue != NULL)
           os << " " << m_initValue->toString();
 
@@ -2029,7 +2028,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       DataRef lhs;
 
       std::string varNameStr = m_lhs->toString();
-      const char* varName = varNameStr.c_str(); // TODO: this is a hack!
+      const std::string& varName = varNameStr.c_str(); // TODO: this is a hack!
 
       ConstrainedVariableId thisVar = context.getVar("this");
       // TODO: modify interpreted object constructor to add vars upfront so that this if stmt isn't necessary
@@ -2040,14 +2039,14 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
           const Domain& domain = rhsValue->derivedDomain();
           ConstrainedVariableId v = object->addVariable(domain,varName);
           lhs = DataRef(v);
-          debugMsg("Interpreter:InterpretedObject","Initialized variable:" << object->getName().toString() << "." << varName << " to " << rhsValue->derivedDomain().toString() << " in constructor");
+          debugMsg("Interpreter:InterpretedObject","Initialized variable:" << object->getName() << "." << varName << " to " << rhsValue->derivedDomain().toString() << " in constructor");
       }
       else {
           lhs = m_lhs->eval(context);
 
           if (m_rhs != NULL) {
               DataRef rhs = m_rhs->eval(context);
-              const DbClientId& pdb = getPDB(context);
+              const DbClientId pdb = getPDB(context);
 
               if (rhs.getValue()->lastDomain().isSingleton()) {
                   pdb->restrict(lhs.getValue(),rhs.getValue()->lastDomain());
@@ -2074,10 +2073,10 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   }
 
 
-  ExprObjectTypeDeclaration::ExprObjectTypeDeclaration(const LabelStr& name)
-      : m_name(name)
-  {
-  }
+ExprObjectTypeDeclaration::ExprObjectTypeDeclaration(const std::string& name)
+    : m_name(name)
+{
+}
 
   ExprObjectTypeDeclaration::~ExprObjectTypeDeclaration()
   {
@@ -2102,7 +2101,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   }
 
 
-  ExprObjectTypeDefinition::ExprObjectTypeDefinition(const ObjectTypeId& objType)
+  ExprObjectTypeDefinition::ExprObjectTypeDefinition(const ObjectTypeId objType)
       : m_registered(false)
       , m_objType(objType)
   {
@@ -2112,7 +2111,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
   {
       if (!m_registered) {
           m_objType->purgeAll();
-          delete (ObjectType*)m_objType;
+          delete static_cast<ObjectType*>(m_objType);
       }
   }
 
@@ -2145,7 +2144,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  ExprRuleTypeDefinition::ExprRuleTypeDefinition(const RuleId& rf)
+  ExprRuleTypeDefinition::ExprRuleTypeDefinition(const RuleId rf)
       : m_ruleFactory(rf)
   {
   }
@@ -2156,7 +2155,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
 
   DataRef ExprRuleTypeDefinition::eval(EvalContext& context) const
   {
-      RuleSchema* rs = (RuleSchema*)context.getElement("RuleSchema");
+    RuleSchema* rs = reinterpret_cast<RuleSchema*>(context.getElement("RuleSchema"));
       rs->registerRule(m_ruleFactory);
       return DataRef::null;
   }
@@ -2170,13 +2169,16 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  void evalArgs(EvalContext& context, std::vector<ConstrainedVariableId>& args,const std::vector<Expr*>& argExprs)
-  {
-      for (unsigned int i=0;i<argExprs.size();i++)
-          args.push_back(argExprs[i]->eval(context).getValue());
-  }
+namespace {
+void evalArgs(EvalContext& context,
+              std::vector<ConstrainedVariableId>& args,
+              const std::vector<Expr*>& argExprs) {
+  for (unsigned int i=0;i<argExprs.size();i++)
+    args.push_back(argExprs[i]->eval(context).getValue());
+}
+}
 
-  ExprMethodCall::ExprMethodCall(const MethodId& m, Expr* varExpr, const std::vector<Expr*>& argExprs)
+  ExprMethodCall::ExprMethodCall(const MethodId m, Expr* varExpr, const std::vector<Expr*>& argExprs)
       : m_method(m)
       , m_varExpr(varExpr)
       , m_argExprs(argExprs)
@@ -2219,7 +2221,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  ExprVariableMethod::ExprVariableMethod(const char* name, Expr* varExpr, const std::vector<Expr*>& argExprs)
+  ExprVariableMethod::ExprVariableMethod(const std::string& name, Expr* varExpr, const std::vector<Expr*>& argExprs)
       : m_methodName(name)
       , m_varExpr(varExpr)
       , m_argExprs(argExprs)
@@ -2251,9 +2253,9 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return eval(context,var,args);
   }
 
-  DataRef ExprVariableMethod::eval(EvalContext& context, ConstrainedVariableId& var, const std::vector<ConstrainedVariableId>& args) const
+  DataRef ExprVariableMethod::eval(EvalContext& context, ConstrainedVariableId var, const std::vector<ConstrainedVariableId>& args) const
   {
-      std::string method(m_methodName.toString());
+      std::string method(m_methodName);
       DbClientId pdb = getPDB(context); // TODO: keep using db client?
 
       if (method=="specify") {
@@ -2287,7 +2289,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  ExprObjectMethod::ExprObjectMethod(const char* name, Expr* objExpr, const std::vector<Expr*>& argExprs)
+  ExprObjectMethod::ExprObjectMethod(const std::string& name, Expr* objExpr, const std::vector<Expr*>& argExprs)
       : m_methodName(name)
       , m_objExpr(objExpr)
       , m_argExprs(argExprs)
@@ -2316,9 +2318,9 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return eval(context,obj,args);
   }
 
-  DataRef ExprObjectMethod::eval(EvalContext& context, ObjectId& obj, const std::vector<ConstrainedVariableId>& args) const
+  DataRef ExprObjectMethod::eval(EvalContext& context, ObjectId obj, const std::vector<ConstrainedVariableId>& args) const
   {
-      std::string method(m_methodName.toString());
+      std::string method(m_methodName);
       DbClientId pdb = getPDB(context); // TODO: keep using db client?
 
       StateVarId stateVar = args[0];
@@ -2346,7 +2348,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  ExprTokenMethod::ExprTokenMethod(const char* name, const char* tokenName, const std::vector<Expr*>& argExprs)
+  ExprTokenMethod::ExprTokenMethod(const std::string& name, const std::string& tokenName, const std::vector<Expr*>& argExprs)
      : m_methodName(name)
      , m_tokenName(tokenName)
      , m_argExprs(argExprs)
@@ -2370,10 +2372,10 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return eval(context,tok,args);
   }
 
-  DataRef ExprTokenMethod::eval(EvalContext& context, TokenId& tok, const std::vector<ConstrainedVariableId>& args) const
+  DataRef ExprTokenMethod::eval(EvalContext& context, TokenId tok, const std::vector<ConstrainedVariableId>& args) const
   {
       checkError(tok.isId(),"Can't evaluate method on null token");
-      std::string method(m_methodName.toString());
+      std::string method(m_methodName);
       DbClientId pdb = getPDB(context); // TODO: keep using db client?
 
       if (method=="activate") {
@@ -2406,7 +2408,7 @@ InterpretedRuleInstance::InterpretedRuleInstance(const RuleInstanceId& parent,
       return os.str();
   }
 
-  ExprProblemStmt::ExprProblemStmt(const char* name, const std::vector<PredicateInstanceRef*>& tokens)
+  ExprProblemStmt::ExprProblemStmt(const std::string& name, const std::vector<PredicateInstanceRef*>& tokens)
       : m_name(name)
       , m_tokens(tokens)
   {

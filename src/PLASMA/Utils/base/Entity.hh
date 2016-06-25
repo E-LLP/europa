@@ -1,15 +1,16 @@
-#ifndef _H_Entity
-#define _H_Entity
+#ifndef H_Entity
+#define H_Entity
 
-#include "LabelStr.hh"
 #include "Id.hh"
+#include "LabelStr.hh"
+#include "PSEntity.hh"
 
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 
-#include "PSUtils.hh"
+
 
 namespace EUROPA{
 
@@ -41,7 +42,7 @@ namespace EUROPA{
       typedef typename COLLECTION::iterator object_iterator;
       for(object_iterator it = objects.begin(); it != objects.end(); ++it){
 	check_error((*it).isValid());
-	Entity* elem = (Entity*) (*it);
+	Entity* elem = static_cast<Entity*>(*it);
 	elem->discard();
       }
       objects.clear();
@@ -50,11 +51,11 @@ namespace EUROPA{
     virtual ~Entity();
 
     inline eint getKey() const {return m_key;}
-    inline PSEntityKey getEntityKey() const {return cast_int(m_key);}
+    inline PSEntityKey getEntityKey() const {return static_cast<PSEntityKey>(cast_int(m_key));}
 
     
     virtual const std::string& getEntityName() const;
-    virtual const LabelStr& getName() const;
+    virtual const std::string& getName() const;
 
     virtual const std::string& getEntityType() const;
 
@@ -62,12 +63,12 @@ namespace EUROPA{
     virtual std::string toLongString() const;
 
     
-    virtual bool canBeCompared(const EntityId&) const;
+    virtual bool canBeCompared(const EntityId) const;
 
     /**
      * @brief Set an external entity reference, indicating an external entity is shadowing this entity.
      */
-    void setExternalEntity(const EntityId& externalEntity);
+    void setExternalEntity(const EntityId externalEntity);
     void setExternalPSEntity(const PSEntity* externalEntity);
 
     /**
@@ -80,7 +81,7 @@ namespace EUROPA{
      * @brief Retrieve an external entity reference, if present.
      * @return Will return EntityId::noId() if not assigned.
      */
-    const EntityId& getExternalEntity() const;
+    const EntityId getExternalEntity() const;
     const PSEntity* getExternalPSEntity() const;
 
     /**
@@ -202,8 +203,25 @@ namespace EUROPA{
       return t1->getKey() < t2->getKey();
     }
 
-    bool operator==(const EntityComparator& c){return true;}
+    bool operator==(const EntityComparator&){return true;}
   };
 
+template<typename T>
+class EntityComparator<T*> {
+ public:
+  bool operator() (const T* t1, const T* t2) const {
+    checkError(t1);
+    checkError(t2);
+    return t1->getKey() < t2->getKey();
+  }
+};
+
+/** 
+ * @struct Discard
+ * Custom deallocator for shared pointers of Entity instances.
+ */
+struct Discard {
+  void operator()(Entity* e) const {e->discard();}
+};
 }
 #endif

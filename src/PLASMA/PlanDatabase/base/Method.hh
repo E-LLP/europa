@@ -8,7 +8,6 @@
 #ifndef METHOD_HH_
 #define METHOD_HH_
 
-#include "LabelStr.hh"
 #include "ConstraintEngineDefs.hh"
 #include "PDBInterpreter.hh"
 #include <vector>
@@ -24,20 +23,20 @@ public:
     Method(const char* name);
     virtual ~Method();
 
-    const MethodId& getId() const;
+    const MethodId getId() const;
 
-    const LabelStr& getName() const;
+    const std::string& getName() const;
 
     virtual DataRef eval(EvalContext& context, const std::vector<ConstrainedVariableId>& args) const = 0;
 
     virtual const std::vector<DataTypeId>& getSignature() = 0;
-    virtual const DataTypeId& getReturnType() = 0;
+    virtual const DataTypeId getReturnType() = 0;
 
     virtual std::string toString() const;
 
 protected:
     MethodId m_id;
-    LabelStr m_name;
+    std::string m_name;
 };
 
 }

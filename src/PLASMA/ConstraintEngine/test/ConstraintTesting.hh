@@ -1,5 +1,5 @@
-#ifndef _H_CONSTRAINT_TESTING
-#define _H_CONSTRAINT_TESTING
+#ifndef H_CONSTRAINT_TESTING
+#define H_CONSTRAINT_TESTING
 
 /**
  * @file ConstraintTesting.hh
@@ -62,7 +62,7 @@ namespace EUROPA {
   /**
    * @brief Execute the tests described by the test cases.
    */
-  bool executeTestCases(const ConstraintEngineId& engine, std::list<ConstraintTestCase>& testCases);
+  bool executeTestCases(const ConstraintEngineId engine, std::list<ConstraintTestCase>& testCases);
 
 }; /* namespace EUROPA */
 #endif // ifndef..

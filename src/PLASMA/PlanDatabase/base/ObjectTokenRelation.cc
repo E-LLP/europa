@@ -12,12 +12,13 @@
  */
 namespace EUROPA {
 
-  ObjectTokenRelation::ObjectTokenRelation(const LabelStr& name,
-					   const LabelStr& propagatorName,
-					   const ConstraintEngineId& constraintEngine,
+  ObjectTokenRelation::ObjectTokenRelation(const std::string& name,
+					   const std::string& propagatorName,
+					   const ConstraintEngineId constraintEngine,
 					   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_token(variables[STATE_VAR]->parent()),
+      m_notifiedObjects(),
       m_currentDomain(static_cast<ObjectDomain&>(getCurrentDomain(variables[OBJECT_VAR]))){
     check_error(m_token.isValid());
     check_error(variables[OBJECT_VAR]->parent() == m_token);
@@ -56,17 +57,17 @@ namespace EUROPA {
     check_error(isValid());
   }
 
-  void ObjectTokenRelation::handleExecute(const ConstrainedVariableId& variable,
-					  int argIndex,
-					  const DomainListener::ChangeType& changeType){
+  void ObjectTokenRelation::handleExecute(const ConstrainedVariableId,
+					  unsigned int,
+					  const DomainListener::ChangeType&){
     handleExecute();
   }
 
   /**
    * Will handle changes immediately as long as the domain is open
    */
-  bool ObjectTokenRelation::canIgnore(const ConstrainedVariableId& variable,
-				      int argIndex,
+  bool ObjectTokenRelation::canIgnore(const ConstrainedVariableId variable,
+				      unsigned int,
 				      const DomainListener::ChangeType& changeType){
 
     if(m_currentDomain.isOpen())
@@ -131,7 +132,7 @@ namespace EUROPA {
 
     // Remove token from objects where the domain has been restricted, and was previously notifed,
     // or where the Token is now inactive
-    bool isActive = m_token->isActive();
+    bool active = m_token->isActive();
 
     unsigned int startIndex = 0;
 
@@ -145,7 +146,7 @@ namespace EUROPA {
 
       ObjectId object = *it;
 
-      if(!isActive || !m_currentDomain.isMember(object)){
+      if(!active || !m_currentDomain.isMember(object)){
         debugMsg("ObjectTokenRelation:notifyRemovals", "Removing " << m_token->toString() << " from " << object->toString());
 	object->remove(m_token);
 	m_notifiedObjects.erase(object);
@@ -167,11 +168,11 @@ namespace EUROPA {
 	}*/
   }
 
-  const std::vector<ConstrainedVariableId>& ObjectTokenRelation::getModifiedVariables(const ConstrainedVariableId& variable) const
-  {
-	  static std::vector<ConstrainedVariableId> s_emptyScope;
-	  return s_emptyScope;
-  }
+const std::vector<ConstrainedVariableId>&
+ObjectTokenRelation::getModifiedVariables(const ConstrainedVariableId) const {
+  static std::vector<ConstrainedVariableId> s_emptyScope;
+  return s_emptyScope;
+}
 
   const std::vector<ConstrainedVariableId>& ObjectTokenRelation::getModifiedVariables() const
   {

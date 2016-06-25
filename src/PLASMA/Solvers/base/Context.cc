@@ -2,22 +2,22 @@
 #include "Error.hh"
 
 namespace EUROPA {
-  namespace SOLVERS {
-    Context::Context(const LabelStr& name) : m_id(this), m_name(name) {}
+namespace SOLVERS {
+Context::Context(const std::string& name) : m_id(this), m_name(name), m_map() {}
     
     Context::~Context() {
       m_id.remove();
     }
 
-    double Context::get(const LabelStr& key) const {
-      std::map<edouble, double>::const_iterator it = m_map.find(key);
-      checkError(it != m_map.end(), "Error: '" << key.toString()  << "' not in context '" << m_name.toString() << "'");
+    double Context::get(const std::string& key) const {
+      std::map<std::string, double>::const_iterator it = m_map.find(key);
+      checkError(it != m_map.end(), "Error: '" << key  << "' not in context '" << m_name << "'");
       return it->second;
     }
 
-    void Context::remove(const LabelStr& key) {
-      std::map<edouble, double>::const_iterator it = m_map.find(key);
-      checkError(it != m_map.end(), "Error: '" << key.toString()  << "' not in context '" << m_name.toString() << "'");
+    void Context::remove(const std::string& key) {
+      std::map<std::string, double>::const_iterator it = m_map.find(key);
+      checkError(it != m_map.end(), "Error: '" << key  << "' not in context '" << m_name << "'");
       m_map.erase(key);
     }
   }

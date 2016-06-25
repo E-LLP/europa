@@ -26,7 +26,7 @@ namespace EUROPA {
   {
   }
 
-  DataRef::DataRef(const ConstrainedVariableId& v)
+  DataRef::DataRef(const ConstrainedVariableId v)
     : m_value(v)
   {
   }
@@ -35,13 +35,13 @@ namespace EUROPA {
   {
   }
 
-  const ConstrainedVariableId& DataRef::getValue() { return m_value; }
+  const ConstrainedVariableId DataRef::getValue() { return m_value; }
 
   /*
    * EvalContext
    */
   EvalContext::EvalContext(EvalContext* parent)
-    : m_parent(parent)
+      : m_parent(parent), m_variables(), m_tokens()
   {
   }
 
@@ -49,13 +49,13 @@ namespace EUROPA {
   {
   }
 
-  void EvalContext::addVar(const char* name,const ConstrainedVariableId& v)
+  void EvalContext::addVar(const std::string& name,const ConstrainedVariableId v)
   {
     m_variables[name] = v;
     debugMsg("Interpreter:EvalContext","Added var:" << name << " to EvalContext");
   }
 
-  ConstrainedVariableId EvalContext::getVar(const char* name)
+  ConstrainedVariableId EvalContext::getVar(const std::string& name)
   {
     std::map<std::string,ConstrainedVariableId>::iterator it =
       m_variables.find(name);
@@ -68,12 +68,12 @@ namespace EUROPA {
       return ConstrainedVariableId::noId();
   }
 
-  void EvalContext::addToken(const char* name,const TokenId& t)
+  void EvalContext::addToken(const std::string& name,const TokenId t)
   {
     m_tokens[name] = t;
   }
 
-  TokenId EvalContext::getToken(const char* name)
+  TokenId EvalContext::getToken(const std::string& name)
   {
     std::map<std::string,TokenId>::iterator it =
       m_tokens.find(name);
@@ -85,6 +85,8 @@ namespace EUROPA {
     else
       return TokenId::noId();
   }
+
+void* EvalContext::getElement(const std::string&) const {return NULL;}
 
   std::string EvalContext::toString() const
   {
@@ -104,7 +106,7 @@ namespace EUROPA {
     std::map<std::string,TokenId>::const_iterator tokenIt = m_tokens.begin();
     os << "    tokens {";
     for (;tokenIt != m_tokens.end();++tokenIt)
-      os << tokenIt->first << " " << tokenIt->second->getPredicateName().toString() << ",";
+      os << tokenIt->first << " " << tokenIt->second->getPredicateName() << ",";
     os << "    }"  << std::endl;
 
     if (m_parent == NULL)
@@ -123,9 +125,7 @@ namespace EUROPA {
 	  return "Expr";
   }
 
-  ExprList::ExprList()
-  {
-  }
+ExprList::ExprList() : m_children() {}
 
   ExprList::~ExprList()
   {
@@ -171,10 +171,9 @@ namespace EUROPA {
   {
   }
 
-  DataRef ExprNoop::eval(EvalContext& context) const
-  {
-      std::cout << "Noop:" << m_str << std::endl;
-      return DataRef::null;
-  }
+DataRef ExprNoop::eval(EvalContext&) const {
+  std::cout << "Noop:" << m_str << std::endl;
+  return DataRef::null;
+}
 }
 

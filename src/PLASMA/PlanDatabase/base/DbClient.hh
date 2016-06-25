@@ -1,9 +1,8 @@
-#ifndef _H_DbClient
-#define _H_DbClient
+#ifndef H_DbClient
+#define H_DbClient
 
 #include "PlanDatabaseDefs.hh"
 #include "PSPlanDatabase.hh"
-#include "Variable.hh"
 #include <vector>
 
 /**
@@ -30,61 +29,58 @@ namespace EUROPA {
    */
   class DbClient {
   public:
-    const DbClientId& getId() const;
+    const DbClientId getId() const;
 
     /**
      * @brief Create a variable
-     * @param type The type for the variable.
+     * @param typeName The type for the variable.
      * @param baseDomain The base domain of the new variable.
      * @param name The name for the variable. Must be unique.
      * @return The Id of the variable created. Will error out rather than return a noId.
      */
-    ConstrainedVariableId createVariable(const char* typeName, const Domain& baseDomain, const char* name, bool isTmpVar = false, bool canBeSpecified=true);
+    ConstrainedVariableId createVariable(const std::string& typeName, const Domain& baseDomain, const std::string& name, bool isTmpVar = false, bool canBeSpecified=true);
 
     /**
      * @brief Create a variable
-     * @param type The type for the variable.
+     * @param typeName The type for the variable.
      * @param name The name for the variable. Must be unique.
      * @return The Id of the variable created. Will error out rather than return a noId.
      */
-    ConstrainedVariableId createVariable(const char* typeName, const char* name, bool isTmpVar = false);
+    ConstrainedVariableId createVariable(const std::string& typeName,
+                                         const std::string& name, bool isTmpVar = false);
 
     /**
      * @brief Delete a variable.  By way of symmetry with createVariable().
      */
-    void deleteVariable(const ConstrainedVariableId& var);
+    void deleteVariable(const ConstrainedVariableId var);
 
     /**
      * @brief Create an object instance in the dabatase.
-     * @param key The expected key value for the object. This is used as a check to ensure we are creating values
-     * in the order we expect.
      * @param type The type of instance to create. Must match a name in the Schema. The daatabase must be open for
      * creation of instances of this type.
      * @param name The name for the instance. Must be unique.
      * @return The Id of the object created. Will error out rather than return a noId.
      */
-    ObjectId createObject(const char* type, const char* name);
+    ObjectId createObject(const std::string& type, const std::string& name);
 
     /**
      * @brief Create an object instance in the dabatase, with a call to a specialized constructor
-     * @param key The expected key value for the object. This is used as a check to ensure we are creating values
-     * in the order we expect.
      * @param type The type of instance to create. Must match a name in the Schema. The database must be open for
      * creation of instances of this type.
      * @param name The name for the instance. Must be unique.
      * @param arguments A vector of name/value pairs used to invoke a particular constructor.
      * @return The Id of the object created. Will error out rather than return a noId.
      */
-    ObjectId createObject(const char* type, const char* name, const std::vector<const Domain*>& arguments);
+    ObjectId createObject(const std::string& type, const std::string& name, const std::vector<const Domain*>& arguments);
 
     /**
      * @brief Delete an object.  By way of symmetry with createObject().
      */
-    void deleteObject(const ObjectId& obj);
+    void deleteObject(const ObjectId obj);
 
     /**
      * @brief Close the database. This will prohibit any further insertion of objects.
-     * @see close(const char* objectType)
+     * @see close(const std::string& objectType)
      */
     void close();
 
@@ -92,67 +88,65 @@ namespace EUROPA {
      * @brief Close the database for further creation of any objects of a given type. Not supported yet. There is no
      * implementation for this yet, since we are not really supporting incremental closure of objects at this time.
      */
-    void close(const char* objectType);
+    void close(const std::string& objectType);
 
     /**
      * @brief Constructs a Token instance.
-     * @param predicateName The name of the predicate for which this token is an instance. Must match a name in the
+     * @param tokenType The name of the predicate for which this token is an instance. Must match a name in the
      * schema.
      * @return The Id of the token created. Will error out rather than return a noId.
      */
-    TokenId createToken(const char* tokenType,
-                        const char* tokenName = NULL,
+    TokenId createToken(const std::string& tokenType,
+                        const std::string& tokenName = "",
                         bool rejectable = false,
                         bool isFact = false);
 
     /**
      * @brief Deletes a token instance.  By way of symmetry with createToken().
      */
-    void deleteToken(const TokenId& token, const std::string& name = "");
+    void deleteToken(const TokenId token, const std::string& name = "");
 
     /**
      * @brief imposes a constraint such that token comes before successor, on the given object.
-     * @param object
+     * @param object The object to constrain to.
      * @param predecessor The token to be the predecessor
      * @param successor The token to be the successor. If 0, the Token is constrained to succeed all
      * other ordered tokens.
-     * @return The resulting 'precedes' constraint
      */
-    void constrain(const ObjectId& object, const TokenId& predecessor, const TokenId& successor);
+    void constrain(const ObjectId object, const TokenId predecessor, const TokenId successor);
 
     /**
      * @brief Frees any constraints imposed on a Token arising from calls to constrain.
      * @param object The object to which the token has been constrained.
      * @param predecessor The token that is the predecessor
      * @param successor The token that is the successor.
-     * @param constraint The constraint to be removed.
      */
-    void free(const ObjectId& object, const TokenId& predecessor, const TokenId& successor);
+    void free(const ObjectId object, const TokenId predecessor, const TokenId successor);
 
     /**
      * @brief Activate the given token
      * @param token The token to be activated. It must be inactive.
      */
-    void activate(const TokenId& token);
+    void activate(const TokenId token);
 
     /**
      * @brief Merge the given token
      * @param token The token to be merged. It must be inactive.
-     * @param activeTokenKey The token to be merged onto.
+     * @param activeToken The token to be merged onto.
      */
-    void merge(const TokenId& token, const TokenId& activeToken);
+    void merge(const TokenId token, const TokenId activeToken);
 
     /**
      * @brief Reject the given token
      * @param token The token to be rejected. It must be inactive.
      */
-    void reject(const TokenId& token);
+    void reject(const TokenId token);
 
     /**
      * @brief Cancel restriction to Token Variables state through activate, merge, or reject
      * @param token The target token
      */
-    void cancel(const TokenId& token);
+    void cancel(const TokenId token);
 
     /**
      * @brief The initial state may include constraints, even if the planner does not express any decisions
@@ -160,9 +154,9 @@ namespace EUROPA {
      * @param name The name of the constraint to be created
      * @param scope The variables to provide the scope of the constraint.
      */
-    ConstraintId createConstraint(const char* name,
+    ConstraintId createConstraint(const std::string& name,
 				  const std::vector<ConstrainedVariableId>& scope,
-				  const char* violationExpl=NULL);
+				  const std::string& violationExpl="");
 
     /**
      * @brief Construction of a unary constraint.
@@ -170,22 +164,22 @@ namespace EUROPA {
      * &param var the target variable.
      * @param domain The domain to restrict against.
      */
-    ConstraintId createConstraint(const char* name,
-				  const ConstrainedVariableId& variable,
+    ConstraintId createConstraint(const std::string& name,
+				  const ConstrainedVariableId variable,
 				  const Domain& domain);
 
     /**
      * @brief Delete a constraint.  By way of symmetry with createConstraint().
      */
-    void deleteConstraint(const ConstraintId& constr);
+    void deleteConstraint(const ConstraintId constr);
 
     /**
      * @brief Restricts the base domain of a variable
      * @param variable The variable to be restricted
-     * @param value The new base domain of the variable.
+     * @param domain The new base domain of the variable.
      * @see getEntityByKey
      */
-    void restrict(const ConstrainedVariableId& variable, const Domain& domain);
+    void restrict(const ConstrainedVariableId variable, const Domain& domain);
 
     /**
      * @brief Binds the value of a variable
@@ -195,19 +189,19 @@ namespace EUROPA {
      * value to specify.
      * @see getEntityByKey
      */
-    void specify(const ConstrainedVariableId& variable, edouble value);
+    void specify(const ConstrainedVariableId variable, edouble value);
 
     /**
      * @brief Close the domains of a dynamic variable.
      * @param variable The dynamic variable to be closed.=
      */
-    void close(const ConstrainedVariableId& variable);
+    void close(const ConstrainedVariableId variable);
 
     /**
      * @brief resets the specified domain of the target variable to its base domain
      * @param variable The variable to be reset
      */
-    void reset(const ConstrainedVariableId& variable);
+    void reset(const ConstrainedVariableId variable);
 
     /*!< Support for interaction with ConsistencyManagement */
 
@@ -222,31 +216,31 @@ namespace EUROPA {
      * @brief Lookup an object by name. It is an error if the object is not present.
      * @return The requested object
      */
-    ObjectId getObject(const char* name) const;
+    ObjectId getObject(const std::string& name) const;
 
     /**
      * @brief Lookup a global variable by name. It is an error if not present
-     * @retrun The requested variable.
+     * @return The requested variable.
      */
-    const ConstrainedVariableId getGlobalVariable(const LabelStr& varName) const;
+    const ConstrainedVariableId getGlobalVariable(const std::string& varName) const;
 
     /**
      * @brief Test if a global exists for a given name
      * @return true if present, otherwise false
      */
-    bool isGlobalVariable(const LabelStr& varName) const;
+    bool isGlobalVariable(const std::string& varName) const;
 
     /**
      * @brief Lookup a global token by name. It is an error if not present
-     * @retrun The requested token.
+     * @return The requested token.
      */
-    const TokenId getGlobalToken(const LabelStr& name) const;
+    const TokenId getGlobalToken(const std::string& name) const;
 
     /**
      * @brief Test if a global exists for a given name
      * @return true if present, otherwise false
      */
-    bool isGlobalToken(const LabelStr& name) const;
+    bool isGlobalToken(const std::string& name) const;
 
     /**
      * @brief Retrieve token defined by a particular path from a root token. Transaction Logging must be enabled.
@@ -257,7 +251,7 @@ namespace EUROPA {
      * @see Token::getChild(int slavePosition)
      * @see enableTransactionLogging
      */
-    TokenId getTokenByPath(const std::vector<int>& relativePath) const;
+    TokenId getTokenByPath(const std::vector<unsigned int>& relativePath) const;
 
     /**
      * @brief Retrieve the relative path for obtaining the target token from a given root token.
@@ -267,7 +261,7 @@ namespace EUROPA {
      * @see getTokenByPath
      * @see enableTransactionLogging
      */
-    std::vector<int> getPathByToken(const TokenId& targetToken) const;
+    std::vector<unsigned int> getPathByToken(const TokenId targetToken) const;
 
     /**
      * @brief Retrieve the relative path for obtaining the target token from a given root token.
@@ -277,7 +271,7 @@ namespace EUROPA {
      * @see getPathByToken
      * @see enableTransactionLogging
      */
-    std::string getPathAsString(const TokenId& targetToken) const;
+    std::string getPathAsString(const TokenId targetToken) const;
 
     /**
      * @brief Retrieve a constrained variable of any type based on its 'index'
@@ -288,21 +282,21 @@ namespace EUROPA {
      * @brief Retrieve an index for a variable. Required for logging. Tricks will have to be done to make
      * this fast!
      */
-    unsigned int getIndexByVariable(const ConstrainedVariableId& var);
+    unsigned int getIndexByVariable(const ConstrainedVariableId var);
 
     ConstraintId getConstraintByIndex(unsigned int index);
 
-    unsigned int getIndexByConstraint(const ConstraintId& constr);
+    unsigned int getIndexByConstraint(const ConstraintId constr);
 
     /**
      * @brief Adds a listener to operations invoked on the client
      */
-    void notifyAdded(const DbClientListenerId& listener);
+    void notifyAdded(const DbClientListenerId listener);
 
     /**
      * @brief Removes a listener
      */
-    void notifyRemoved(const DbClientListenerId& listener);
+    void notifyRemoved(const DbClientListenerId listener);
 
 
     /**
@@ -337,23 +331,23 @@ namespace EUROPA {
     /**
      * @brief Create a value for a string
      */
-    edouble createValue(const char* typeName, const std::string& value);
+    edouble createValue(const std::string& typeName, const std::string& value);
         
     // Temporarily exposing these to remove singletons, need to review DbClient concept in general
-    const CESchemaId& getCESchema() const;
-    const SchemaId& getSchema() const;
+    const CESchemaId getCESchema() const;
+    const SchemaId getSchema() const;
 
   private:
     friend class PlanDatabase;
 
-    DbClient(const PlanDatabaseId& db);
+    DbClient(const PlanDatabaseId db);
     ~DbClient();
     DbClient(); /* NO IMPL */
     DbClient(const DbClient&); /* NO IMPL */
 
     /*!< Helper methods */
-    TokenId allocateToken(const char* tokenType,
-                          const char* tokenName,
+    TokenId allocateToken(const std::string& tokenType,
+                          const std::string& tokenName,
                           bool rejectable,
                           bool isFact=false);
 
@@ -368,7 +362,7 @@ namespace EUROPA {
   class PSPlanDatabaseClientImpl : public PSPlanDatabaseClient
   {
     public:
-      PSPlanDatabaseClientImpl(const DbClientId& c);
+      PSPlanDatabaseClientImpl(const DbClientId c);
 
       virtual PSVariable* createVariable(const std::string& typeName, const std::string& name, bool isTmpVar);
       virtual void deleteVariable( PSVariable* var);

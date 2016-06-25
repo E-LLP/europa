@@ -1,5 +1,5 @@
-#ifndef _H_Pdlfcn
-#define _H_Pdlfcn
+#ifndef H_Pdlfcn
+#define H_Pdlfcn
 
 /**
  * @file   Pdlfcn.hh
@@ -10,11 +10,6 @@
  *         emulate the unix dl functions using Apple's API.
  * @ingroup Utils
  */
-#ifndef __MINGW32__
-#  include <dlfcn.h>
-#else
-#  define RTLD_NOW 0
-#endif
 
 namespace EUROPA {
 

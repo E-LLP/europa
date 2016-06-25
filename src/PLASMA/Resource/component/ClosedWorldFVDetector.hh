@@ -1,5 +1,5 @@
-#ifndef _H_ClosedWorldFVDetector
-#define _H_ClosedWorldFVDetector
+#ifndef H_ClosedWorldFVDetector
+#define H_ClosedWorldFVDetector
 
 #include "GenericFVDetector.hh"
 namespace EUROPA {
@@ -9,8 +9,8 @@ namespace EUROPA {
 		ClosedWorldFVDetector(const ResourceId res);
 
 	protected:
-		virtual void getFDLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const; // Level Bounds for FlawDetection
-		virtual void getVDLevelBounds(const InstantId& inst, edouble& lb, edouble& ub) const; // Level Bounds for ViolationDetection
+		virtual void getFDLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const; // Level Bounds for FlawDetection
+		virtual void getVDLevelBounds(const InstantId inst, edouble& lb, edouble& ub) const; // Level Bounds for ViolationDetection
 	};
 }
 

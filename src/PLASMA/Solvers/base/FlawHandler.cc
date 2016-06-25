@@ -13,18 +13,21 @@
 #include "PlanDatabase.hh"
 #include "Utils.hh"
 #include "XMLUtils.hh"
+#include "tinyxml.h"
 #include <math.h>
 
 namespace EUROPA {
-  namespace SOLVERS {
+namespace SOLVERS {
 
-
-
-    FlawHandler::FlawHandler(const TiXmlElement& configData):
-        MatchingRule(configData),
-        m_configData(makeConfigData(configData)),
-      m_guards(readGuards(configData, false)),
-      m_masterGuards(readGuards(configData, true)){
+FlawHandler::FlawHandler(const TiXmlElement& configData): 
+    MatchingRule(configData),
+    m_configData(makeConfigData(configData)),
+    m_priority(0),
+    m_weight(0),
+    m_guards(readGuards(configData, false)),
+    m_masterGuards(readGuards(configData, true)),
+    m_db(),
+    m_maxChoices(0){
 
       // Establish the priority
       const char* priorityStr = m_configData->Attribute("priority");
@@ -37,8 +40,6 @@ namespace EUROPA {
       const char* maxChoicesStr =  m_configData->Attribute("maxChoices");
       m_maxChoices = static_cast<unsigned int>(atof(maxChoicesStr));
 
-      checkError(m_maxChoices >= 0, maxChoicesStr << " must be positive");
-
       // The base uses a number that exceeds the max absolute value priority allowed.
       // It also multiplies by a minimum of 1 to ensure that 0 guards are handled as low weights.
       // Note also that we make it 2 so that defaul t compatibility heuristics 
@@ -46,9 +47,14 @@ namespace EUROPA {
       refreshWeight();
     }
     
-    void FlawHandler::refreshWeight() {
-      m_weight = std::abs(m_priority - (2+staticFilterCount() + customStaticFilterCount() + m_guards.size() + m_masterGuards.size()) * WEIGHT_BASE());
-    }
+void FlawHandler::refreshWeight() {
+  m_weight = 
+      std::abs(m_priority - 
+               (2.0 + staticFilterCount() + customStaticFilterCount() + 
+                static_cast<double>(m_guards.size()) + 
+                static_cast<double>(m_masterGuards.size())) * 
+               WEIGHT_BASE());
+}
 
     /**
      * @brief Process the input element to pull defaults from the parent
@@ -58,7 +64,7 @@ namespace EUROPA {
       checkError(configData.Parent() != NULL, "Must have a parent to get the default properties.");
 
       TiXmlElement* element = static_cast<TiXmlElement*>(configData.Clone());
-      TiXmlElement* parent = (TiXmlElement*) configData.Parent();
+      TiXmlElement* parent = static_cast<TiXmlElement*>(configData.Parent());
 
       if(element->Attribute("priority") == NULL){
         if(parent->Attribute("defaultPriority") != NULL)
@@ -79,11 +85,13 @@ namespace EUROPA {
       delete m_configData;
     }
 
-    Priority FlawHandler::getPriority(const EntityId&) { return m_priority;}
+    Priority FlawHandler::getPriority(const EntityId) { return m_priority;}
  
     double FlawHandler::getWeight() const {return m_weight;}
     
-    unsigned int FlawHandler::getMaxChoices() const {return m_maxChoices;}
+  unsigned int FlawHandler::getMaxChoices() const {return m_maxChoices;}
+
+  bool FlawHandler::customStaticMatch(const EntityId) const {return true;}
 
     std::string FlawHandler::toString() const{
       std::stringstream sstr;
@@ -118,8 +126,8 @@ namespace EUROPA {
 
     std::string FlawHandler::toString(const GuardEntry& entry){
       std::stringstream sstr;
-      LabelStr varName = entry.first;
-      sstr << varName.toString() << " == ";
+      std::string varName = entry.first;
+      sstr << varName << " == ";
 
       if(LabelStr::isString(entry.second))
         sstr << LabelStr(entry.second).toString();
@@ -131,8 +139,8 @@ namespace EUROPA {
       return sstr.str();
     }
 
-    edouble FlawHandler::convertValueIfNecessary(const PlanDatabaseId& db,
-                                                const ConstrainedVariableId& guardVar,
+    edouble FlawHandler::convertValueIfNecessary(const PlanDatabaseId db,
+                                                const ConstrainedVariableId guardVar,
                                                 const edouble& testValue){
       // Convert if an object variable. Make it the object id.
       if(db->getSchema()->isObjectType(guardVar->baseDomain().getTypeName())){
@@ -181,7 +189,7 @@ namespace EUROPA {
         else {
           LabelStr lblStr(data);
           // Cast to a double
-          value = (edouble) lblStr;
+          value = lblStr.getKey();
         }
       }
 
@@ -195,7 +203,7 @@ namespace EUROPA {
       return sl_noGuards;
     }
 
-    bool FlawHandler::makeConstraintScope(const EntityId& entity, std::vector<ConstrainedVariableId>& scope) const {
+    bool FlawHandler::makeConstraintScope(const EntityId entity, std::vector<ConstrainedVariableId>& scope) const {
       checkError(hasGuards(), "Should not call unless there are guards on the handler.");
 
       TokenId token = getTokenFromEntity(entity);
@@ -207,7 +215,7 @@ namespace EUROPA {
       if(!m_guards.empty()){
         for (std::vector< GuardEntry >::const_iterator it = m_guards.begin(); it != m_guards.end(); ++it){
           const GuardEntry& entry = *it;
-          const LabelStr& guardName = entry.first;
+          const std::string& guardName = entry.first;
           ConstrainedVariableId guard = token->getVariable(guardName);
 
           // If it does not have the required variable, return false
@@ -227,7 +235,7 @@ namespace EUROPA {
 
         for (std::vector< GuardEntry >::const_iterator it = m_masterGuards.begin(); it != m_masterGuards.end(); ++it){
           const GuardEntry& entry = *it;
-          const LabelStr& guardName = entry.first;
+          const std::string& guardName = entry.first;
           ConstrainedVariableId guard = master->getVariable(guardName);
 
           // If it does not have the required variable, return false
@@ -266,11 +274,11 @@ namespace EUROPA {
     }
 
     /* Have to convert if it is an object variable */
-    bool FlawHandler::matches(const ConstrainedVariableId& guardVar, const edouble& testValue){
+    bool FlawHandler::matches(const ConstrainedVariableId guardVar, const edouble& testValue){
       if(!guardVar->lastDomain().isSingleton())
         return false;
 
-      const PlanDatabaseId& pdb = getPlanDatabase(guardVar);
+      const PlanDatabaseId pdb = getPlanDatabase(guardVar);
       edouble convertedValue = convertValueIfNecessary(pdb, guardVar, testValue);
 
       condDebugMsg(pdb->getSchema()->isObjectType(guardVar->baseDomain().getTypeName()),"FlawHandler:matches",
@@ -283,7 +291,7 @@ namespace EUROPA {
       return guardVar->lastDomain().getSingletonValue() == convertedValue;
     }
 
-    const PlanDatabaseId& FlawHandler::getPlanDatabase(const ConstrainedVariableId& tokenVar){
+    const PlanDatabaseId FlawHandler::getPlanDatabase(const ConstrainedVariableId tokenVar){
       if(m_db.isNoId()){
         checkError(tokenVar->parent().isId() && TokenId::convertable(tokenVar->parent()),
                    tokenVar->toString() << " should have a parent token.");
@@ -294,7 +302,7 @@ namespace EUROPA {
       return m_db;
     }
 
-    TokenId FlawHandler::getTokenFromEntity(const EntityId& entity){
+    TokenId FlawHandler::getTokenFromEntity(const EntityId entity){
       if(TokenId::convertable(entity))
         return entity;
 
@@ -313,16 +321,17 @@ namespace EUROPA {
 
     /** FlawHandler::VariableListener **/
 
-    FlawHandler::VariableListener::VariableListener(const LabelStr& name,
-                                                    const LabelStr& propagatorName,
-                                                    const ConstraintEngineId& constraintEngine, 
-                                                    const std::vector<ConstrainedVariableId>& variables)
-      : Constraint(name, propagatorName, constraintEngine, variables), m_isApplied(false) {}
+FlawHandler::VariableListener::VariableListener(const std::string& name,
+                                                const std::string& propagatorName,
+                                                const ConstraintEngineId constraintEngine, 
+                                                const std::vector<ConstrainedVariableId>& variables)
+    : Constraint(name, propagatorName, constraintEngine, variables), 
+      m_target(), m_flawManager(), m_flawHandler(), m_isApplied(false) {}
 
-    FlawHandler::VariableListener::VariableListener(const ConstraintEngineId& ce,
-                                                    const EntityId& target,
-                                                    const FlawManagerId& flawManager,
-                                                    const FlawHandlerId& flawHandler,
+    FlawHandler::VariableListener::VariableListener(const ConstraintEngineId ce,
+                                                    const EntityId target,
+                                                    const FlawManagerId flawManager,
+                                                    const FlawHandlerId flawHandler,
                                                     const std::vector<ConstrainedVariableId>& scope)
       : Constraint(CONSTRAINT_NAME(), PROPAGATOR_NAME(), ce, scope),
         m_target(target), m_flawManager(flawManager), m_flawHandler(flawHandler), m_isApplied(false) {}

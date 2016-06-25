@@ -1,5 +1,5 @@
-#ifndef _H_LabelStr
-#define _H_LabelStr
+#ifndef H_LabelStr
+#define H_LabelStr
 
 /**
  * @file LabelStr.hh
@@ -9,10 +9,10 @@
  */
 
 #include "CommonDefs.hh"
-#include "Error.hh"
+#include "Number.hh"
 #include <map>
 #include <string>
-#include <boost/unordered_map.hpp>
+//#include <boost/unordered_map.hpp>
 
 
 namespace EUROPA {
@@ -44,7 +44,7 @@ namespace EUROPA {
 
     /**
      * @brief Constructor
-     * @param The symbolic value as a string
+     * @param label The symbolic value as a string
      */
     LabelStr(const std::string& label);
 
@@ -68,6 +68,7 @@ namespace EUROPA {
       return(m_key);
     }
 
+
 #else
 
     /**
@@ -81,6 +82,10 @@ namespace EUROPA {
     operator edouble () const;
 
 #endif
+    inline operator std::string() const {
+      return toString();
+    }
+
 
     /**
      * @brief Lexical ordering test - less than
@@ -133,7 +138,7 @@ namespace EUROPA {
      * @return The number of elements found.
      * @see getElement
      */
-    unsigned int countElements(const char* delimiter) const;
+    unsigned long countElements(const char* delimiter) const;
 
     /**
      * @brief Return the requested element in a delimited string
@@ -144,14 +149,14 @@ namespace EUROPA {
      * 2. 'A:B:C:DEF', > 3 => error
      *
      * @param index The position of the requested element
-     * @param delimeter The delimeter to mark
+     * @param delimiter The delimeter to mark
      */
-    LabelStr getElement(unsigned int index, const char* delimiter) const;
+    LabelStr getElement(unsigned long index, const char* delimiter) const;
 
     /**
      * @brief Return the number of strings stored.
      */
-    static unsigned int getSize();
+    static unsigned long getSize();
 
     /**
      * @brief Obtain the key for the given string and possibly conducting an insertion into keysFromString.
@@ -201,10 +206,6 @@ namespace EUROPA {
     /*static std::map< double, std::string>& stringFromKeys();*/ /**< Map keys to strings for string retrieval - i.e. toString(). */
     static std::map<std::string, edouble>& keysFromString();
     static std::map<edouble, std::string>& stringFromKeys();
-
-#ifndef EUROPA_FAST
-    const char* m_chars;
-#endif
 
   };
 }

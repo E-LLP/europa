@@ -1,18 +1,19 @@
 #include "CommonAncestorConstraint.hh"
 #include "Object.hh"
+#include "CESchema.hh"
 
 namespace EUROPA{
 
-  CommonAncestorConstraint::CommonAncestorConstraint(const LabelStr& name,
-						     const LabelStr& propagatorName,
-						     const ConstraintEngineId& constraintEngine,
-						     const std::vector<ConstrainedVariableId>& variables)
+CommonAncestorConstraint::CommonAncestorConstraint(const std::string& name,
+                                                   const std::string& propagatorName,
+                                                   const ConstraintEngineId constraintEngine,
+                                                   const std::vector<ConstrainedVariableId>& variables)
     : Constraint(name, propagatorName, constraintEngine, variables),
       m_first(static_cast<ObjectDomain&>(getCurrentDomain(variables[0]))),
       m_second(static_cast<ObjectDomain&>(getCurrentDomain(variables[1]))),
       m_restrictions(static_cast<ObjectDomain&>(getCurrentDomain(variables[2]))) {
-    check_error(variables.size() == 3);
-  }
+  check_error(variables.size() == 3);
+}
 
   CommonAncestorConstraint::~CommonAncestorConstraint(){}
 
@@ -30,15 +31,15 @@ namespace EUROPA{
       apply(m_second, m_first);
   }
 
-  void CommonAncestorConstraint::handleExecute(const ConstrainedVariableId& variable,
-					       int argIndex,
-					       const DomainListener::ChangeType& changeType){
+  void CommonAncestorConstraint::handleExecute(const ConstrainedVariableId,
+					       unsigned int,
+					       const DomainListener::ChangeType&){
     handleExecute();
   }
 
-  bool CommonAncestorConstraint::canIgnore(const ConstrainedVariableId& variable,
-					   int argIndex,
-					   const DomainListener::ChangeType& changeType){
+  bool CommonAncestorConstraint::canIgnore(const ConstrainedVariableId,
+					   unsigned int argIndex,
+					   const DomainListener::ChangeType&){
     check_error(argIndex <= 2);
     return (!m_first.isSingleton() && !m_second.isSingleton());
   }
@@ -61,7 +62,7 @@ namespace EUROPA{
 
     singletonAncestors.push_back(singletonObject); // Has at least one, itself
 
-    const DataTypeId& dt = m_constraintEngine->getCESchema()->getDataType(singletonObject->getRootType().c_str());
+    const DataTypeId dt = m_constraintEngine->getCESchema()->getDataType(singletonObject->getRootType().c_str());
     ObjectDomain setOfAncestors(dt,singletonAncestors);
 
     //std::cout << ", " << setOfAncestors ;
@@ -84,7 +85,7 @@ namespace EUROPA{
       check_error(candidate.isValid());
       candidate->getAncestors(candidatesAncestors);
       candidatesAncestors.push_back(candidate);
-      const DataTypeId& candidateRootDT = m_constraintEngine->getCESchema()->getDataType(candidate->getRootType().c_str());
+      const DataTypeId candidateRootDT = m_constraintEngine->getCESchema()->getDataType(candidate->getRootType().c_str());
       ObjectDomain od(candidateRootDT,candidatesAncestors);
       //std::cout << "Candidate " << candidate->getName().toString() << " has ancestors " << od << std::endl;
       od.intersect(setOfAncestors);

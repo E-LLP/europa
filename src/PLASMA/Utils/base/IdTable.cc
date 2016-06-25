@@ -34,24 +34,22 @@
 
 namespace EUROPA {
 
-  unsigned int getEntryKey(std::pair<unsigned int,edouble>& entry)
-  {
+namespace {
+unsigned int getEntryKey(std::pair<unsigned int,edouble>& entry) {
     return entry.first;
-  }
+}
 
-  LabelStr getEntryType(std::pair<unsigned int,edouble>& entry)
-  {
+LabelStr getEntryType(std::pair<unsigned int,edouble>& entry) {
     return LabelStr(entry.second);
-  }
+}
 
-  pthread_mutex_t& IdTableMutex()
-  {
-      static pthread_mutex_t sl_mutex = PTHREAD_MUTEX_INITIALIZER;
-      return sl_mutex;
-  }
+pthread_mutex_t& IdTableMutex() {
+  static pthread_mutex_t sl_mutex = PTHREAD_MUTEX_INITIALIZER;
+  return sl_mutex;
+}
+}
 
-  IdTable::IdTable() {
-  }
+IdTable::IdTable() : m_collection(), m_typeCnts() {}
 
   IdTable::~IdTable() {
   }
@@ -60,10 +58,10 @@ namespace EUROPA {
     static IdTable sl_instance;
     return(sl_instance);
   }
-  unsigned int IdTable::size() {
-    MutexGrabber mg(IdTableMutex());
-    return(getInstance().m_collection.size());
-  }
+unsigned long IdTable::size() {
+  MutexGrabber mg(IdTableMutex());
+  return(getInstance().m_collection.size());
+}
 
   bool IdTable::allocated(unsigned long int id) {
     MutexGrabber mg(IdTableMutex());
@@ -143,26 +141,25 @@ namespace EUROPA {
     os << std::endl;
   }
 
-  void IdTable::checkResult(bool result, unsigned int id_count)
-  {
-	  Entity::garbageCollect();
+void IdTable::checkResult(bool result, unsigned long id_count) {
+  Entity::garbageCollect();
 
-	  if (result && IdTable::size() <= id_count) {
-		  debugMsg("Test"," PASSED.");
-	  }
-	  else {
-		  if (result) {
-			  std::cerr << " FAILED = DID NOT CLEAN UP ALLOCATED IDs:\n";
-			  IdTable::output(std::cerr);
-			  std::cerr << "\tWere " << id_count << " IDs before; " << IdTable::size() << " now";
-			  std::cerr << std::endl;
-			  throw Error::GeneralMemoryError();
-		  }
-		  else {
-			  std::cerr << "      " << " FAILED TO PASS UNIT TEST." << std::endl;
-			  throw Error::GeneralUnknownError();
-		  }
-	  }
+  if (result && IdTable::size() <= id_count) {
+    debugMsg("Test"," PASSED.");
   }
+  else {
+    if (result) {
+      std::cerr << " FAILED = DID NOT CLEAN UP ALLOCATED IDs:\n";
+      IdTable::output(std::cerr);
+      std::cerr << "\tWere " << id_count << " IDs before; " << IdTable::size() << " now";
+      std::cerr << std::endl;
+      throw Error::GeneralMemoryError();
+    }
+    else {
+      std::cerr << "      " << " FAILED TO PASS UNIT TEST." << std::endl;
+      throw Error::GeneralUnknownError();
+    }
+  }
+}
 
 }

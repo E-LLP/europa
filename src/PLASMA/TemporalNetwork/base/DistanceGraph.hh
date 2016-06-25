@@ -12,8 +12,8 @@
 //  ownership of the software is hereby transferred.  This notice shall
 //  remain on all copies of the software.
 
-#ifndef _H_DistGraph
-#define _H_DistGraph
+#ifndef H_DistGraph
+#define H_DistGraph
 
 #include "TemporalNetworkDefs.hh"
 #include "Entity.hh"
@@ -24,6 +24,7 @@
 #include <queue>
 #include <string>
 #include <limits>
+#include <boost/scoped_ptr.hpp>
 
 namespace EUROPA {
 
@@ -97,11 +98,16 @@ class DistanceGraph {
   Int dijkstraGeneration;
 protected:
   std::vector<DnodeId> nodes;
-  Dqueue* dqueue;
-  BucketQueue* bqueue;
+  boost::scoped_ptr<Dqueue> dqueue;
+  boost::scoped_ptr<BucketQueue> bqueue;
   std::list<DedgeId> edgeNogoodList;
+
+  Void attachEdge(std::vector<DedgeId>& edgeArray, Int& size, Int& count, DedgeId edge);
+  Void detachEdge(std::vector<DedgeId>& edgeArray, Int& count, DedgeId edge);
+
 public:
 
+  void addNode(DnodeId node);
   /**
    * @brief Create a new node and add it to the network
    * @return the new network node
@@ -121,7 +127,7 @@ public:
   /**
   * @brief Add edge to the network
   * @param from start of the edge
-  * @param end end of the edge
+  * @param to end of the edge
   * @param length length of the edge
   */
   Void addEdgeSpec(DnodeId from, DnodeId to, Time length);
@@ -175,7 +181,7 @@ public:
    * @param source start node
    * @param destination terminal node (optional)
    */
-  Void dijkstra(DnodeId source, DnodeId destination = DnodeId::noId());
+  Void dijkstra(DnodeId source, DnodeId destination = DnodeId(static_cast<Dnode*>(NULL)));
 
    /**
    * @brief Incremental version of Dijkstra's algorithum
@@ -187,19 +193,19 @@ public:
    * algorithm. Propagation limited to reach nodes within a bound
    * distance from source with given min/max potential.
    */
-  Void boundedDijkstraForward (const DnodeId& source,
+  Void boundedDijkstraForward (const DnodeId source,
                                               Time bound,
                                               Time minPotential) {
     boundedDijkstra (source, bound, minPotential, +1);
   }
 
-  Void boundedDijkstraBackward (const DnodeId& source,
+  Void boundedDijkstraBackward (const DnodeId source,
                                               Time bound,
                                               Time maxPotential) {
     boundedDijkstra (source, bound, maxPotential, -1);
   }
 private:
-  Void boundedDijkstra (const DnodeId& source,
+  Void boundedDijkstra (const DnodeId source,
                                        Time bound,
                                        Time destPotential,
                                        int direction);
@@ -251,16 +257,16 @@ protected:
    */
   bool hasNode(const DnodeId node) const;
 
-  Dqueue* initializeDqueue();
+  Dqueue& initializeDqueue();
 
-  BucketQueue* initializeBqueue();
+  BucketQueue& initializeBqueue();
 
   /**
    * @brief If a subclass does not need EdgeSpec maintenance, it can call
    * createEdge directly.  (The DispatchGraph uses this feature.)
    * @param from from node
    * @param to to node
-   * @param time duration of edge
+   * @param length duration of edge
    */
    DedgeId createEdge(DnodeId from, DnodeId to, Time length);
 
@@ -280,9 +286,12 @@ protected:
    * @brief Allow subclass to take action when a node is updated
    * @param node node updated
    */
-  virtual void handleNodeUpdate(const DnodeId& node) {}
+  virtual void handleNodeUpdate(const DnodeId node);
 
 private:
+  
+  DistanceGraph(const DistanceGraph&);
+  DistanceGraph& operator=(const DistanceGraph&);
   Void deleteEdge(DedgeId edge);
   Void eraseEdge(DedgeId edge);
   Void preventNodeMarkOverflow();
@@ -309,19 +318,13 @@ class Dnode : public Entity {
 protected:
 
   void handleDiscard(){
-    if (inArray != nullptr)
-      delete[] inArray;
-    if (outArray != nullptr)
-      delete[] outArray;
-
     Entity::handleDiscard();
   }
 
-  DnodeId m_id;
-  DedgeId* inArray;
+  std::vector<DedgeId> inArray;
   Int inArraySize;
   Int inCount;
-  DedgeId* outArray;
+  std::vector<DedgeId> outArray;
   Int outArraySize;
   Int outCount;
   std::map<DnodeId,DedgeId> edgemap;
@@ -330,12 +333,10 @@ protected:
   Int depth;  // Depth of propagation for testing against the BF limit.
   Time key; // Used for priority ordering */
 private:
+  Dnode(const Dnode&);
+  Dnode& operator=(const Dnode&);
 public:
-  /**
-   * @brief get node's id
-   * @return node's id
-   */
-  inline const DnodeId& getId() const {return m_id;}
+
   DnodeId link;        // For creating linked-list of nodes (for Dqueue)
 protected:
   DedgeId predecessor;      // For reconstructing negative cycles.
@@ -345,25 +346,12 @@ private:
   Int generation;     // Used for obsoleting Dijkstra-calculated distances.
 public:
 
-  Dnode() : m_id(this) {
-      inArray = nullptr;
-      inArraySize = 0;
-      inCount = 0;
-      outArray = nullptr;
-      outArraySize = 0;
-      outCount = 0;
-      distance = 0;
-      potential = 0;
-      depth = 0;
-      key = 0;
-      link = DnodeId::noId();
-      predecessor = DedgeId::noId();
-      markLocal = 0;
-      generation = 0;
+  Dnode() : inArray(), inArraySize(0), inCount(0), outArray(),
+            outArraySize(0), outCount(0), edgemap(), distance(0), potential(0), depth(0),
+            key(0), link(), predecessor(), markLocal(0), generation(0) {
   }
   virtual ~Dnode() {
     discard(false);
-    m_id.remove();
   }
 
   Time getTimeKey() { return distance - potential; }  // Used in Dijkstra
@@ -391,7 +379,6 @@ public:
 class Dedge {
   friend class DistanceGraph;
   std::vector<Time> lengthSpecs;
-  DedgeId m_id;
 
 public:
   DnodeId to;
@@ -400,16 +387,11 @@ public:
   /**
    * @brief constructor
    */
-  Dedge ():m_id(this){}
+  Dedge ():lengthSpecs(), to(), from(), length(0) {}
   /**
    * @brief destructor
    */
-  ~Dedge(){m_id.remove();}
-  /**
-   * @breif get id of edge
-   * @return id of edge
-   */
-  const DedgeId& getId() const {return m_id;}
+  ~Dedge(){}
 };
 
  /**
@@ -426,7 +408,7 @@ public:
   Time key;
 
 private:
-  Bucket (const DnodeId& n, Time distance) { node=n ; key=distance; }
+  Bucket (const DnodeId n, Time distance) : node(n), key(distance) {}
 
   friend class BucketQueue;
 };
@@ -453,6 +435,9 @@ typedef std::priority_queue<Bucket,std::vector<Bucket>,BucketComparator> DnodePr
  * @ingroup TemporalNetwork
 */
 class BucketQueue {
+private:
+  BucketQueue(const BucketQueue&);
+  BucketQueue& operator=(const BucketQueue&);
   DnodePriorityQueue* buckets;
 public:
 
@@ -510,7 +495,7 @@ class Dqueue {
   DnodeId first;
   DnodeId last;
 public:
-
+  Dqueue() : first(), last() {}
   /**
    * @brief remove all nodes from the queue
    */

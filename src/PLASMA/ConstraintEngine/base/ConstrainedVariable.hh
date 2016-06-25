@@ -1,5 +1,5 @@
-#ifndef _H_ConstrainedVariable
-#define _H_ConstrainedVariable
+#ifndef H_ConstrainedVariable
+#define H_ConstrainedVariable
 
 /**
  * @file ConstrainedVariable.hh
@@ -9,11 +9,9 @@
  */
 
 #include "ConstraintEngineDefs.hh"
-#include "PSVarValue.hh"
 #include "PSConstraintEngine.hh"
 #include "Entity.hh"
-#include "LabelStr.hh"
-#include "Domain.hh"
+#include "unused.hh"
 #include <set>
 
 namespace EUROPA {
@@ -24,12 +22,12 @@ namespace EUROPA {
   class ConstrainedVariableListener{
   public:
     virtual ~ConstrainedVariableListener();
-    const ConstrainedVariableListenerId& getId() const;
-    virtual void notifyDiscard() {}  // message for listener creator to immediately delete listener
-    virtual void notifyConstraintAdded(const ConstraintId& constr, int argIndex) {}
-    virtual void notifyConstraintRemoved(const ConstraintId& constr, int argIndex) {}
+    const ConstrainedVariableListenerId getId() const;
+    virtual void notifyDiscard();  // message for listener creator to immediately delete listener
+    virtual void notifyConstraintAdded(const ConstraintId constr, unsigned int argIndex);
+    virtual void notifyConstraintRemoved(const ConstraintId constr, unsigned int argIndex);
   protected:
-    ConstrainedVariableListener(const ConstrainedVariableId& var);
+    ConstrainedVariableListener(const ConstrainedVariableId var);
     ConstrainedVariableListenerId m_id;
     ConstrainedVariableId m_var;
   };
@@ -57,10 +55,7 @@ namespace EUROPA {
   public:
     DECLARE_ENTITY_TYPE(ConstrainedVariable);
 
-    static const LabelStr& NO_NAME() {
-      static const LabelStr sl_noName(NO_VAR_NAME);
-      return(sl_noName);
-    }
+    static const std::string& NO_NAME(); 
 
     /**
      * Should not be called unless all constraints have been removed.
@@ -70,11 +65,11 @@ namespace EUROPA {
     /**
      * @brief Simple accessor.
      */
-    const ConstrainedVariableId& getId() const;
+    const ConstrainedVariableId getId() const;
 
     const std::string& getEntityType() const;
 
-    const DataTypeId& getDataType() const;
+    const DataTypeId getDataType() const;
 
     /**
      * @brief Validates the relationships of the class.
@@ -100,12 +95,12 @@ namespace EUROPA {
     /**
      * @brief Retrive the count of constraints direclt on this variable
      */
-    unsigned int constraintCount() const;
+    unsigned long constraintCount() const;
 
     /**
      * @brief Retrieve one constraint on this variable.  Returns noId if there are none.
      */
-    const ConstraintId& getFirstConstraint() const;
+    const ConstraintId getFirstConstraint() const;
 
     /**
      * @brief Test of the variable has at least one active constraint
@@ -169,7 +164,7 @@ namespace EUROPA {
      *
      * @note I don't think this is adequate since it provides no
      * feedback whether the lock was acquired or not.
-     * --wedgingt@ptolemy.arc.nasa.gov 2004 Feb 11
+     * --wedgingt 2004 Feb 11
      *
      * CMG: Wrong. if you try lock, and already locked it will error
      * out. There is a method to test if a lock is already present.
@@ -179,7 +174,7 @@ namespace EUROPA {
      * before either gets the lock and then both would try to get the
      * lock, causing one to error out despite following the
      * interface's requirement to test if unlocked first.
-     * --wedgingt@ptolemy.arc.nasa.gov 2004 Apr 21
+     * --wedgingt 2004 Apr 21
      *
      * This does not have any support in a multi-theraded environment. One must first
      * obtain a mutex elsewhere. Therefore, this is quite adequate.
@@ -201,19 +196,19 @@ namespace EUROPA {
     /**
      * @brief Accessor for variable name.
      */
-    const LabelStr& getName() const;
+    const std::string& getName() const;
 
     /**
      * @brief Convenience method to get at parents of variables.  In some cases,
      * variables may not have a parent entity, so the default implementation
      * is to return noId.
      */
-    const EntityId& parent() const;
+    const EntityId parent() const;
 
     /**
      * @brief Accessor for the ConstraintEngine
      */
-    const ConstraintEngineId& getConstraintEngine() const;
+    const ConstraintEngineId getConstraintEngine() const;
 
     /**
      * @brief Utility to capture the state of the constraint.
@@ -221,7 +216,7 @@ namespace EUROPA {
     virtual std::string toString() const;
     virtual std::string toLongString() const;
 
-    static const int NO_INDEX = -1;
+    static const unsigned long NO_INDEX = 0;
 
     /**
      * @brief Access the index.
@@ -229,7 +224,7 @@ namespace EUROPA {
      * a ConstrainedVariable to have an index reflecting its location in the parent.
      * @return NO_INDEX if there is no parent, otherwise a value > 0 indicating a position relevant to the caller.
      */
-    int getIndex() const;
+    unsigned long getIndex() const;
 
     /**
      * @brief Retrieve the last computed domain of the variable.
@@ -322,12 +317,12 @@ namespace EUROPA {
     /**
      * @brief Supports the merging of variables by propagating messages on restriction of a base domain of a variable
      */
-    virtual void handleBase(const Domain&) {}
+    virtual void handleBase(const Domain& dom);
 
     /**
      * @brief Supports the merging of variables by propagating messages on specification of a variable
      */
-    virtual void handleSpecified(edouble value) {}
+    virtual void handleSpecified(edouble value);
 
     /**
      * @brief Supports the merging of variables by propagating message on reset of a specified domain
@@ -337,12 +332,12 @@ namespace EUROPA {
     /**
      * @brief Hook up a listener to propagate notifications of deletion
      */
-    void notifyAdded(const ConstrainedVariableListenerId& listener);
+    void notifyAdded(const ConstrainedVariableListenerId listener);
 
     /**
      * @brief Remove a listener
      */
-    void notifyRemoved(const ConstrainedVariableListenerId& listener);
+    void notifyRemoved(const ConstrainedVariableListenerId listener);
     /**
      * @brief Utility to obtain a display version of a double encoded value.
      */
@@ -396,12 +391,12 @@ namespace EUROPA {
      * @param parent An optional parent entity reference.
      * @param index An optional index indicating the position in the parent entity collection.
      */
-    ConstrainedVariable(const ConstraintEngineId& constraintEngine,
+    ConstrainedVariable(const ConstraintEngineId constraintEngine,
 			const bool internal,
 			bool canBeSpecified,
-			const LabelStr& name,
-			const EntityId& parent = EntityId::noId(),
-			int index = NO_INDEX);
+			const std::string& name,
+			const EntityId parent = EntityId::noId(),
+			unsigned long index = NO_INDEX);
 
     /**
      * @brief Allows subclass to add specific extra-work without over-riding core behavior.
@@ -432,7 +427,7 @@ namespace EUROPA {
     friend class ConstraintEngine; /**< Grant access so the ConstraintEngine can reset the variable domain without exposing this behaviour
 				     publicly.*/
 
-    friend class Propagator; /*<! Grant access so the Propagator can reset the variable domain without exposing this behaviour
+    friend class Propagator; /**< Grant access so the Propagator can reset the variable domain without exposing this behaviour
 				     publicly.*/
 
     /**
@@ -456,26 +451,26 @@ namespace EUROPA {
      * @param constraint - must be a valid id.
      * @param argIndex - the position of this variable in the scope of the constraint.
      */
-    void addConstraint(const ConstraintId& constraint, int argIndex);
+    void addConstraint(const ConstraintId constraint, unsigned int argIndex);
 
     /**
      * @brief Called by Constraint on destruction to retract the constraint from the variable.
      * @param constraint - must be a valid id.
      * @param argIndex - the position of this variable in the scope of the constraint.
      */
-    void removeConstraint(const ConstraintId& constraint, int argIndex);
+    void removeConstraint(const ConstraintId constraint, unsigned int argIndex);
 
     /**
      * @brief Allow derived class to implement additional functionality for
      * addition of a constraint.
      */
-    virtual void handleConstraintAdded(const ConstraintId&){}
+    virtual void handleConstraintAdded(const ConstraintId){}
 
     /**
      * @brief Allow derived class to implement additional functionality for
      *  removal of a constraint.
      */
-    virtual void handleConstraintRemoved(const ConstraintId&){}
+    virtual void handleConstraintRemoved(const ConstraintId){}
 
     /**
      * @brief Helper method to reset to a specific domain
@@ -492,34 +487,34 @@ namespace EUROPA {
      * @return true if present in the list, otherwise false.
      * @see Constraint::isVariableOf()
      */
-    bool isConstrainedBy(const ConstraintId& constraint);
+    bool isConstrainedBy(const ConstraintId constraint);
 
     /**
      * @brief Called by the ConstraintEngine to update the cycle count.
      * @param cycleCount The current relaxation cycle counter in the ConstraintEngine.
      * @see ConstraintEngine::notifyRelaxed
      */
-    void updateLastRelaxed(int cycleCount);
+    void updateLastRelaxed(unsigned int cycleCount);
 
     /**
      * @brief Accessor to the current cycle count stored on the variable
      * @return m_lastRelaxed the last propagation cycle in which the variable was relaxed.
      */
-    int lastRelaxed() const;
+    unsigned int lastRelaxed() const;
 
 
 
-    int m_lastRelaxed; /**< Holds the cycle in which the variable was last relaxed */
+    unsigned int m_lastRelaxed; /**< Holds the cycle in which the variable was last relaxed */
     const ConstraintEngineId m_constraintEngine; /**< Reference to the ConstraintEngine to which this variable belongs.
 						    The  construction model of this class ensures
 						    that it is always set to a valid ConstraintEngineId. */
-    LabelStr m_name;
+    std::string m_name;
     const bool m_internal;
     const bool m_canBeSpecified;
     bool m_specifiedFlag; /**< True of internalSpecify is called.
 			   It is possible that !canBeSpecified() && m_hasBeenSpecified */
     edouble m_specifiedValue; /**< Only meaningful if specifiedFlag set */
-    const int m_index; /**< Locator for variable if constained by some entity. Default is NO_INDEX */
+    const unsigned long m_index; /**< Locator for variable if constained by some entity. Default is NO_INDEX */
     const EntityId m_parent;
     unsigned int m_deactivationRefCount;/*!< The number of outstanding deactivation requests. */
     bool m_deleted; /*!< True when constraint is in the destructor. Otherwise false. */
@@ -533,10 +528,10 @@ namespace EUROPA {
   /**
    * @brief Helper method to cast singleton values
    */
-  template<class T>
-  Id<T> id(const ConstrainedVariableId& var){
-    return var->baseDomain().getSingletonValue();
-  }
+  // template<class T>
+  // Id<T> id(const ConstrainedVariableId var){
+  //   return var->baseDomain().getSingletonValue();
+  // }
 
 
 

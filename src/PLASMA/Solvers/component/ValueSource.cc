@@ -15,7 +15,7 @@
 namespace EUROPA {
   namespace SOLVERS {
 
-    ValueSource* ValueSource::getSource(const SchemaId& schema, const ConstrainedVariableId& var, bool externalOrder) {
+    ValueSource* ValueSource::getSource(const SchemaId schema, const ConstrainedVariableId var, bool externalOrder) {
       if(externalOrder)
 	return new OrderedValueSource(var->lastDomain());
       if(var->lastDomain().isEnumerated())
@@ -32,8 +32,8 @@ namespace EUROPA {
 
     Domain::size_type ValueSource::getCount() const { return m_count;}
 
-    EnumValueSource::EnumValueSource(const SchemaId& schema, const Domain& dom)
-      : ValueSource(dom.getSize()) {
+  EnumValueSource::EnumValueSource(const SchemaId, const Domain& dom)
+      : ValueSource(dom.getSize()), m_values() {
       std::list<edouble> values;
       dom.getValues(values);
       //this isn't necessary anymore (I think), since object domains are now entity keys
@@ -48,9 +48,11 @@ namespace EUROPA {
 
     edouble EnumValueSource::getValue(Domain::size_type index) const { return m_values[index];}
 
-    OrderedValueSource::OrderedValueSource(const Domain& dom) : ValueSource(0), m_dom(dom) {
-      checkError(!m_dom.isEmpty(), "Cannot create a value ordering for empty domain " << m_dom);
-    }
+  OrderedValueSource::OrderedValueSource(const Domain& dom) 
+      : ValueSource(0), m_values(), m_dom(dom) {
+    checkError(!m_dom.isEmpty(), 
+               "Cannot create a value ordering for empty domain " << m_dom);
+  }
     
     void OrderedValueSource::addValue(const edouble value) {
       if(m_dom.isMember(value)) {
@@ -74,7 +76,7 @@ namespace EUROPA {
     edouble IntervalValueSource::getValue(Domain::size_type index) const {return m_lb + (m_step * index);}
 
     Domain::size_type IntervalValueSource::calculateSize(const Domain& dom){
-      return cast_int(((dom.getUpperBound() - dom.getLowerBound())/dom.minDelta()) + 1);
+      return static_cast<unsigned>(cast_int(((dom.getUpperBound() - dom.getLowerBound())/dom.minDelta()) + 1));
     }
   }
 }

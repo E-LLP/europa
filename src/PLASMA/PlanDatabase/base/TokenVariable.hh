@@ -1,11 +1,9 @@
-#ifndef _H_TokenVariable
-#define _H_TokenVariable
+#ifndef H_TokenVariable
+#define H_TokenVariable
 
 #include "Token.hh"
 #include "PlanDatabaseDefs.hh"
 #include "Variable.hh"
-//#include "Token.hh"
-
 
 /**
  * @file Provides implementation and interface for TokenVariables.
@@ -25,13 +23,13 @@ namespace EUROPA{
   template <class DomainType>
   class TokenVariable : public Variable<DomainType> {
   public:
-    TokenVariable(const TokenId& parent,
-		  int index,
-		  const ConstraintEngineId& constraintEngine,
+    TokenVariable(const TokenId parent,
+		  unsigned long index,
+		  const ConstraintEngineId constraintEngine,
 		  const Domain& baseDomain,
 		  const bool internal = false,
 		  bool canBeSpecified = true,
-		  const LabelStr& name = ConstrainedVariable::NO_NAME());
+		  const std::string& name = ConstrainedVariable::NO_NAME());
 
     virtual ~TokenVariable();
 
@@ -55,11 +53,14 @@ namespace EUROPA{
 
     void handleReset();
 
-    bool isCompatible(const ConstrainedVariableId& var) const;
+    bool isCompatible(const ConstrainedVariableId var) const;
 
-    const TokenId& getParentToken() const;
+    const TokenId getParentToken() const;
 
   private:
+private:
+    TokenVariable(const TokenVariable<DomainType>&);
+    TokenVariable<DomainType>& operator=(const TokenVariable<DomainType>&);
     // Internal methods for specification that circumvent test for canBeSpeciifed()
     friend class Token;
     void setSpecified(edouble singletonValue);
@@ -67,9 +68,9 @@ namespace EUROPA{
 
     bool computeBaseDomain();
 
-    void handleConstraintAdded(const ConstraintId& constraint);
+    void handleConstraintAdded(const ConstraintId constraint);
 
-    void handleConstraintRemoved(const ConstraintId& constraint);
+    void handleConstraintRemoved(const ConstraintId constraint);
 
     DomainType* m_integratedBaseDomain; /**< The integrated base domain over this and all supported tokens. */
     bool m_isLocallySpecified;
@@ -78,26 +79,25 @@ namespace EUROPA{
   };
 
   template <class DomainType>
-  const TokenId& TokenVariable<DomainType>::getParentToken() const { return m_parentToken; }
+  const TokenId TokenVariable<DomainType>::getParentToken() const { return m_parentToken; }
 
-  template <class DomainType>
-  TokenVariable<DomainType>::TokenVariable(const TokenId& parent,
-					   int index,
-					   const ConstraintEngineId& constraintEngine,
-					   const Domain& baseDomain,
-					   const bool internal,
-					   bool canBeSpecified,
-					   const LabelStr& name)
-    : Variable<DomainType>(constraintEngine, baseDomain, internal, canBeSpecified, name, parent, index),
-      m_integratedBaseDomain(static_cast<DomainType*>(baseDomain.copy())), m_isLocallySpecified(false), m_localSpecifiedValue(0),
-      m_parentToken(parent){
-    check_error(m_parentToken.isValid());
-    check_error(this->getIndex() >= 0);
-    if (this->isSpecified()) {
-    	m_isLocallySpecified = true;
-    	m_localSpecifiedValue = baseDomain.getSingletonValue();
-    }
+template <class DomainType>
+TokenVariable<DomainType>::TokenVariable(const TokenId _parent,
+                                         unsigned long index,
+                                         const ConstraintEngineId constraintEngine,
+                                         const Domain& _baseDomain,
+                                         const bool internal,
+                                         bool _canBeSpecified,
+                                         const std::string& name)
+    : Variable<DomainType>(constraintEngine, _baseDomain, internal, _canBeSpecified, name, _parent, index),
+    m_integratedBaseDomain(static_cast<DomainType*>(_baseDomain.copy())), m_isLocallySpecified(false), m_localSpecifiedValue(0),
+    m_parentToken(_parent){
+  check_error(m_parentToken.isValid());
+  if (this->isSpecified()) {
+    m_isLocallySpecified = true;
+    m_localSpecifiedValue = _baseDomain.getSingletonValue();
   }
+}
 
   template <class DomainType>
   TokenVariable<DomainType>::~TokenVariable()
@@ -253,7 +253,7 @@ namespace EUROPA{
   }
 
   template <class DomainType>
-  void TokenVariable<DomainType>::handleConstraintAdded(const ConstraintId& constraint){
+  void TokenVariable<DomainType>::handleConstraintAdded(const ConstraintId constraint){
     // Not valid to add a constraint if token is rejected
     //check_error(!this->m_parentToken->isRejected());
 
@@ -265,7 +265,7 @@ namespace EUROPA{
   }
 
   template <class DomainType>
-  void TokenVariable<DomainType>::handleConstraintRemoved(const ConstraintId& constraint){
+  void TokenVariable<DomainType>::handleConstraintRemoved(const ConstraintId constraint){
     // If the Token has been merged, then have to handle the migrated constraint also. For
     // Example, suppose a constraint was posted on the token.
     if(this->m_parentToken->isMerged() && !constraint->isActive())
@@ -273,7 +273,7 @@ namespace EUROPA{
   }
 
   template<class DomainType>
-  bool TokenVariable<DomainType>::isCompatible(const ConstrainedVariableId& var) const {
+  bool TokenVariable<DomainType>::isCompatible(const ConstrainedVariableId var) const {
     Id<TokenVariable <DomainType> > id(var);
 
     if(id.isNoId() || this->m_index != id->getIndex() || TokenVariable<DomainType>::getBaseDomain() != id->getBaseDomain())

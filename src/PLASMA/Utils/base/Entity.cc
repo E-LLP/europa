@@ -66,7 +66,7 @@ class EntityInternals {
       debugMsg("Entity:garbageCollect",
                "Garbage collecting entity " << entity->getEntityName() << "(" << 
                entity->getKey() << ")");
-      delete (Entity*) entity;
+      delete entity;
       count++;
     }
 
@@ -112,7 +112,8 @@ internals_accessor internals() {
 }
 
 
-Entity::Entity(): m_key(0), m_refCount(1), m_discarded(false){
+Entity::Entity(): m_externalEntity(), m_key(0), m_refCount(1), m_discarded(false), 
+                  m_dependents() {
   internals_accessor i(internals());
   m_key = i.second.get().allocateKey(this);
   check_error(!i.second.get().isPurging());
@@ -175,17 +176,16 @@ const std::string& Entity::getEntityType() const {
 	  return toString();
   }
 
-  const std::string& Entity::getEntityName() const
-  {
-	  return getName().toString();
-  }
+const std::string& Entity::getEntityName() const {
+  return getName();
+}
 
-  const LabelStr& Entity::getName() const {
-	  static const LabelStr NO_NAME("NO_NAME_Entity");
-	  return NO_NAME;
-  }
+const std::string& Entity::getName() const {
+  static const std::string NO_NAME("NO_NAME_Entity");
+  return NO_NAME;
+}
 
-  bool Entity::canBeCompared(const EntityId&) const{ return true;}
+  bool Entity::canBeCompared(const EntityId) const{ return true;}
 
   EntityId Entity::getEntity(const eint key){
     return internals().second.get().getEntity(key);
@@ -195,7 +195,7 @@ const std::string& Entity::getEntityType() const {
     return internals().second.get().getEntities(resultSet);
   }
 
-  void Entity::setExternalEntity(const EntityId& externalEntity){
+  void Entity::setExternalEntity(const EntityId externalEntity){
     check_error(m_externalEntity.isNoId());
     check_error(externalEntity.isValid());
     m_externalEntity = externalEntity;
@@ -213,14 +213,14 @@ const std::string& Entity::getEntityType() const {
     clearExternalEntity();
   }
 
-  const EntityId& Entity::getExternalEntity() const{
-    check_error(m_externalEntity.isNoId() || m_externalEntity.isValid());
-    return m_externalEntity;
-  }
+const EntityId Entity::getExternalEntity() const{
+  check_error(m_externalEntity.isNoId() || m_externalEntity.isValid());
+  return m_externalEntity;
+}
 
-  const PSEntity* Entity::getExternalPSEntity() const {
-    return (const PSEntity*) getExternalEntity();
-  }
+const PSEntity* Entity::getExternalPSEntity() const {
+  return dynamic_cast<const PSEntity*>(static_cast<Entity*>(getExternalEntity()));
+}
 
   void Entity::purgeStarted(){
     internals().second.get().purgeStarted();
@@ -281,7 +281,7 @@ bool Entity::isPurging(){
     m_dependents.erase(entity);
   }
 
-  void Entity::notifyDiscarded(const Entity* entity) {}
+  void Entity::notifyDiscarded(const Entity*) {}
 
   bool Entity::isPooled(Entity* entity) {
     return internals().second.get().isPooled(entity);

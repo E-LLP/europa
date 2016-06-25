@@ -6,38 +6,38 @@
 
 namespace EUROPA{
 
-  EventToken::EventToken(const PlanDatabaseId& planDatabase,
-			 const LabelStr& predicateName,
-			 bool rejectable,
-			 bool isFact,
-			 const IntervalIntDomain& timeBaseDomain,
-			 const LabelStr& objectName,
-			 bool closed)
+EventToken::EventToken(const PlanDatabaseId planDatabase,
+                       const std::string& predicateName,
+                       bool rejectable,
+                       bool _isFact,
+                       const IntervalIntDomain& timeBaseDomain,
+                       const std::string& objectName,
+                       bool closed)
     :Token(planDatabase, predicateName,
 	   rejectable,
-	   isFact,
+	   _isFact,
 	   IntervalIntDomain(0, 0),
 	   objectName,
-	   closed){
-    commonInit(timeBaseDomain);
-  }
+	   closed), m_time() {
+  commonInit(timeBaseDomain);
+}
 
-  EventToken::EventToken(const TokenId& master,
-			 const LabelStr& relation,
-			 const LabelStr& predicateName,
+  EventToken::EventToken(const TokenId _master,
+			 const std::string& relation,
+			 const std::string& predicateName,
 			 const IntervalIntDomain& timeBaseDomain,
-			 const LabelStr& objectName,
+			 const std::string& objectName,
 			 bool closed)
-    :Token(master, relation, predicateName,
+    :Token(_master, relation, predicateName,
 	   IntervalIntDomain(0, 0),
 	   objectName,
-	   closed){
+	   closed), m_time() {
     commonInit(timeBaseDomain);
   }
 
-  const TempVarId& EventToken::start() const{return m_time;}
-  const TempVarId& EventToken::end() const{return m_time;}
-  const TempVarId& EventToken::getTime() const{return m_time;}
+  const TempVarId EventToken::start() const{return m_time;}
+  const TempVarId EventToken::end() const{return m_time;}
+  const TempVarId EventToken::getTime() const{return m_time;}
 
   void EventToken::commonInit(const IntervalIntDomain& timeBaseDomain){
     m_time = (new TokenVariable<IntervalIntDomain>(m_id,
@@ -46,7 +46,7 @@ namespace EUROPA{
 						   timeBaseDomain,
 						   false, // TODO: fixme
 						   true,
-						   LabelStr("time")))->getId();
+						   "time"))->getId();
     m_allVariables.push_back(m_time);
   }
 }

@@ -20,12 +20,12 @@ Method::~Method()
     m_id.remove();
 }
 
-const MethodId& Method::getId() const
+const MethodId Method::getId() const
 {
     return m_id;
 }
 
-const LabelStr& Method::getName() const
+const std::string& Method::getName() const
 {
     return m_name;
 }

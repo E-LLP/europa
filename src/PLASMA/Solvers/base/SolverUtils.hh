@@ -1,7 +1,6 @@
 #ifndef H_PlannerUtils
 #define H_PlannerUtils
 
-#include "LabelStr.hh"
 #include "ConstrainedVariable.hh"
 #include "RuleInstance.hh"
 #include "Token.hh"
@@ -10,13 +9,13 @@
 #include "SolverDefs.hh"
 
 namespace EUROPA {
-  namespace SOLVERS {
+namespace SOLVERS {
 
-    DECLARE_GLOBAL_CONST(LabelStr, WILD_CARD);
-    DECLARE_GLOBAL_CONST(LabelStr, DELIMITER);
-    DECLARE_GLOBAL_CONST(unsigned int, ZERO_COMMITMENT_SCORE);
-    DECLARE_GLOBAL_CONST(unsigned int, WORST_SCORE);
+DECLARE_GLOBAL_CONST(std::string, WILD_CARD);
+DECLARE_GLOBAL_CONST(std::string, DELIMITER);
+DECLARE_GLOBAL_CONST(long, ZERO_COMMITMENT_SCORE);
+DECLARE_GLOBAL_CONST(long, WORST_SCORE);
 
-  }
+}
 }
 #endif

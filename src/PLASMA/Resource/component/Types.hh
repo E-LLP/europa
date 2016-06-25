@@ -1,5 +1,5 @@
-#ifndef _TYPES_HEADER_FILE_
-#define _TYPES_HEADER_FILE_
+#ifndef TYPES_HEADER_FILE_
+#define TYPES_HEADER_FILE_
 
 /**
  * @file Types.hh
@@ -32,7 +32,7 @@
 
 #define TRACE_GRAPH 0
 
-#ifdef TRACE_GRAPH
+#if TRACE_GRAPH
 
 #define graphDebug( msg )  { \
     std::stringstream sstr; \
@@ -62,51 +62,54 @@ namespace EUROPA
   typedef std::list< Edge* > EdgeList;
   typedef std::list< Node* > NodeList;
 
-  class NodeHash: 
-    public std::unary_function<Node*, size_t>
+class NodeHash
 #ifdef _MSC_VER
-    , public hash_compare< Node * >
+    : public hash_compare< Node * >
 #endif //_MSC_VER
+{
+ public:
+  typedef Node* argument_type;
+  typedef size_t result_type;
+  size_t operator()(Node* n) const
   {
-  public:
-    size_t operator()(Node* n) const
-    {
-      boost::hash<long> H;
-      return H( (long) n);
-    }
-  };
+    boost::hash<long> H;
+    return H( reinterpret_cast<long>(n));
+  }
+};
 
-  class EdgeHash:
-    public std::unary_function<Edge*, size_t>
+  class EdgeHash
 #ifdef _MSC_VER
-    , public hash_compare< Edge * >
+      : public hash_compare< Edge * >
 #endif //_MSC_VER
   {
-  public:
+   public:
+    typedef Edge* argument_type;
+    typedef size_t result_type;
     size_t operator()(Edge* n) const
     {
       boost::hash<long> H;
-      return H( (long) n );
+      return H( reinterpret_cast<long>(n) );
     }
     
   };
 
-  class TransactionIdHash:
-    public std::unary_function< TransactionId, size_t>
+  class TransactionIdHash
 #ifdef _MSC_VER
-    , public hash_compare< TransactionId >
+      : public hash_compare< TransactionId >
 #endif //_MSC_VER
   {
-  public:
+   public:
+    typedef TransactionId argument_type;
+    typedef size_t result_type;
     size_t operator()(TransactionId n) const
     {
       boost::hash<long> H;
-      return H( (long) ( (Transaction*) n ) );
+      return H(reinterpret_cast<long>(static_cast<Transaction*>(n)));
     }
     
   };
 
-//TODO: Do we need to keep this _MSC_VER branch?
+//TODO: Do we need to keep this MSC_VER branch?
 #ifdef _MSC_VER
   typedef map< Node*, bool > Node2Bool;
   typedef map< Node*, eint > Node2Int;

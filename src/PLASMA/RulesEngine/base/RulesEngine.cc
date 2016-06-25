@@ -20,17 +20,17 @@ namespace EUROPA{
   private:
     friend class RulesEngine;
 
-    DbRuleEngineConnector(const PlanDatabaseId& planDatabase, const RulesEngineId& rulesEngine)
+    DbRuleEngineConnector(const PlanDatabaseId planDatabase, const RulesEngineId rulesEngine)
       : PlanDatabaseListener(planDatabase), m_rulesEngine(rulesEngine){}
-    void notifyActivated(const TokenId& token){m_rulesEngine->notifyActivated(token);}
-    void notifyDeactivated(const TokenId& token){m_rulesEngine->notifyDeactivated(token);}
-    void notifyTerminated(const TokenId& token){m_rulesEngine->notifyDeactivated(token);}
+    void notifyActivated(const TokenId token){m_rulesEngine->notifyActivated(token);}
+    void notifyDeactivated(const TokenId token){m_rulesEngine->notifyDeactivated(token);}
+    void notifyTerminated(const TokenId token){m_rulesEngine->notifyDeactivated(token);}
     const RulesEngineId m_rulesEngine;
   };
 
   class RulesEngineCallback : public PostPropagationCallback {
   public:
-    RulesEngineCallback(const ConstraintEngineId& ce, const RulesEngineId& re) : PostPropagationCallback(ce), m_re(re) {}
+    RulesEngineCallback(const ConstraintEngineId ce, const RulesEngineId re) : PostPropagationCallback(ce), m_re(re) {}
 
     bool operator()() {
       if(m_re->hasWork()) {
@@ -43,10 +43,16 @@ namespace EUROPA{
     RulesEngineId m_re;
   };
 
-  RulesEngine::RulesEngine(const RuleSchemaId& schema, const PlanDatabaseId& planDatabase)
+  RulesEngine::RulesEngine(const RuleSchemaId schema, const PlanDatabaseId planDatabase)
     : m_id(this)
     , m_schema(schema)
     , m_planDb(planDatabase)
+    , m_planDbListener()
+    , m_callback()
+    , m_ruleInstancesByToken()
+    , m_listeners()
+    , m_ruleInstancesToExecute()
+    , m_ruleInstancesToUndo()
     , m_deleted(false)
     , m_executing(false)
   {
@@ -55,30 +61,30 @@ namespace EUROPA{
     check_error(m_planDb->getTokens().empty());
   }
 
-  RulesEngine::~RulesEngine(){
-    check_error(m_planDbListener.isValid());
+RulesEngine::~RulesEngine(){
+  check_error(m_planDbListener.isValid());
 
-    // If we are not purging, then events should have propagated removal of all rule instances
-    check_error(Entity::isPurging() || m_ruleInstancesByToken.empty());
+  // If we are not purging, then events should have propagated removal of all rule instances
+  check_error(Entity::isPurging() || m_ruleInstancesByToken.empty());
 
-    m_deleted = true;
-    // Thus, only if we are in purge mode will we directly remove rule instances
-    for(std::multimap<eint, RuleInstanceId>::const_iterator it=m_ruleInstancesByToken.begin();it!=m_ruleInstancesByToken.end();++it){
-      RuleInstanceId ruleInstance = it->second;
-      check_error(ruleInstance.isValid());
-      ruleInstance->discard();
-    }
-
-    delete (PlanDatabaseListener*) m_planDbListener;  // removes itself from the plan database set of listeners
-    delete (PostPropagationCallback*) m_callback;
-    m_id.remove();
+  m_deleted = true;
+  // Thus, only if we are in purge mode will we directly remove rule instances
+  for(std::multimap<eint, RuleInstanceId>::const_iterator it=m_ruleInstancesByToken.begin();it!=m_ruleInstancesByToken.end();++it){
+    RuleInstanceId ruleInstance = it->second;
+    check_error(ruleInstance.isValid());
+    ruleInstance->discard();
   }
 
-  const RulesEngineId& RulesEngine::getId() const{return m_id;}
+  delete static_cast<PlanDatabaseListener*>(m_planDbListener);  // removes itself from the plan database set of listeners
+  delete static_cast<PostPropagationCallback*>(m_callback);
+  m_id.remove();
+}
 
-  const PlanDatabaseId& RulesEngine::getPlanDatabase() const {return m_planDb;}
+  const RulesEngineId RulesEngine::getId() const{return m_id;}
 
-  const RuleSchemaId& RulesEngine::getRuleSchema() const { return m_schema; }
+  const PlanDatabaseId RulesEngine::getPlanDatabase() const {return m_planDb;}
+
+  const RuleSchemaId RulesEngine::getRuleSchema() const { return m_schema; }
 
 
   std::set<RuleInstanceId> RulesEngine::getRuleInstances() const{
@@ -88,7 +94,7 @@ namespace EUROPA{
     return ruleInstances;
   }
 
-  void RulesEngine::getRuleInstances(const TokenId& token,std::set<RuleInstanceId>& results) const{
+  void RulesEngine::getRuleInstances(const TokenId token,std::set<RuleInstanceId>& results) const{
     check_error(token.isValid());
     std::multimap<eint, RuleInstanceId>::const_iterator it = m_ruleInstancesByToken.find(token->getKey());
     while(it!=m_ruleInstancesByToken.end() && it->first == token->getKey()){
@@ -115,7 +121,7 @@ namespace EUROPA{
     }
   }
 
-  void RulesEngine::notifyActivated(const TokenId& token){
+  void RulesEngine::notifyActivated(const TokenId token){
     check_error(token.isValid());
     check_error(token->isActive());
     check_error(m_ruleInstancesByToken.find(token->getKey()) == m_ruleInstancesByToken.end());
@@ -131,16 +137,16 @@ namespace EUROPA{
     }
   }
 
-  void RulesEngine::notifyDeactivated(const TokenId& token){
+  void RulesEngine::notifyDeactivated(const TokenId token){
     check_error(!Entity::isPurging());
     cleanupRuleInstances(token);
   }
 
-  void RulesEngine::notifyTerminated(const TokenId& token){
+  void RulesEngine::notifyTerminated(const TokenId token){
     cleanupRuleInstances(token);
   }
 
-  void RulesEngine::cleanupRuleInstances(const TokenId& token){
+  void RulesEngine::cleanupRuleInstances(const TokenId token){
     check_error(token.isValid());
 
     std::multimap<eint, RuleInstanceId>::iterator it = m_ruleInstancesByToken.find(token->getKey());
@@ -153,7 +159,7 @@ namespace EUROPA{
 
   }
 
-  bool RulesEngine::hasPendingRuleInstances(const TokenId& token) const {
+  bool RulesEngine::hasPendingRuleInstances(const TokenId token) const {
     check_error(token.isValid());
     std::multimap<eint, RuleInstanceId>::const_iterator it = m_ruleInstancesByToken.find(token->getKey());
     while(it!=m_ruleInstancesByToken.end() && it->first == token->getKey()){
@@ -166,7 +172,7 @@ namespace EUROPA{
     return false;
   }
 
-  bool RulesEngine::isPending(const RuleInstanceId& r) const {
+  bool RulesEngine::isPending(const RuleInstanceId r) const {
     // Try r directly
     if(!r->isExecuted() && !r->willNotFire()){
       debugMsg("RulesEngine:isPending", "Found pending rule:" << r->getKey() << " for " << r->getToken()->toString());
@@ -196,12 +202,12 @@ namespace EUROPA{
       m_listeners.erase(listener);
   }
 
-  void RulesEngine::scheduleForExecution(const RuleInstanceId& r) {
+  void RulesEngine::scheduleForExecution(const RuleInstanceId r) {
     debugMsg("RulesEngine:scheduleForExecution", "Scheduling rule " << r->toString());
     m_ruleInstancesToExecute.push_back(r);
   }
 
-  void RulesEngine::scheduleForUndoing(const RuleInstanceId& r) {
+  void RulesEngine::scheduleForUndoing(const RuleInstanceId r) {
     debugMsg("RulesEngine:scheduleForUndoing", "Scheduling rule " << r->toString());
     m_ruleInstancesToUndo.push_back(r);
   }

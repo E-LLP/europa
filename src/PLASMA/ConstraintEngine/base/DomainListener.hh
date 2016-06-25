@@ -1,5 +1,5 @@
-#ifndef _H_DomainListener
-#define _H_DomainListener
+#ifndef H_DomainListener
+#define H_DomainListener
 
 /**
  * @file DomainListener.hh
@@ -58,7 +58,7 @@ namespace EUROPA{
      * modified when ChangeType is added to.
      * @see ChangeType
      */
-    static const int EVENT_COUNT = (int)LAST_CHANGE_TYPE;
+    static const int EVENT_COUNT = static_cast<int>(LAST_CHANGE_TYPE);
 
     static std::string toString(const ChangeType& changeType);
 
@@ -83,11 +83,11 @@ namespace EUROPA{
     /**
      * @brief Id accessor
      */
-    const DomainListenerId& getId() const;
+    const DomainListenerId getId() const;
 
     /**
      * @brief The critical method to implement in order to define how events are to be propagated.
-     * @param changetype the type of change occuring on the domain.
+     * @param changeType the type of change occuring on the domain.
      */
     virtual void notifyChange(const ChangeType& changeType) = 0;
 

@@ -12,10 +12,14 @@
 #include "DbClientTransactionPlayer.hh"
 #include "DbClientTransactionLog.hh"
 #include "Utils.hh"
+#include "CESchema.hh"
 
 #include <algorithm>
 #include <iostream>
 #include <sstream>
+
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 namespace EUROPA {
 
@@ -67,10 +71,10 @@ namespace EUROPA {
     return sl_retval;
   }
 
-  static const std::vector<int>
+  static const std::vector<unsigned int>
   pathAsVector(const std::string & path) {
     size_t path_back, path_front, path_end;
-    std::vector<int> result;
+    std::vector<unsigned int> result;
     path_back = 0;
     path_end = path.size();
     while (true) {
@@ -79,33 +83,32 @@ namespace EUROPA {
         break;
       }
       std::string numstr = path.substr(path_back, path_front-path_back);
-      result.push_back(atoi(numstr.c_str()));
+      result.push_back(static_cast<unsigned>(atoi(numstr.c_str())));
       path_back = path_front + 1;
     }
     std::string numstr = path.substr(path_back, path_end-path_back);
-    result.push_back(atoi(numstr.c_str()));
+    result.push_back(static_cast<unsigned>(atoi(numstr.c_str())));
     return result;
   }
 
   DbClientTransactionPlayer::DbClientTransactionPlayer(const DbClientId & client)
-    : m_client(client), m_objectCount(0), m_varCount(0) {
+      : m_client(client), m_objectCount(0), m_varCount(0), m_filters(), m_tokens(),
+        m_variables(), m_relations(){
   }
 
   DbClientTransactionPlayer::~DbClientTransactionPlayer() {
   }
 
 
-  const SchemaId& DbClientTransactionPlayer::getSchema() const
-  {
-      return m_client->getSchema();
-  }
+SchemaId DbClientTransactionPlayer::getSchema() const {
+  return m_client->getSchema();
+}
 
-  const CESchemaId& DbClientTransactionPlayer::getCESchema() const
-  {
-      return m_client->getCESchema();
-  }
+CESchemaId DbClientTransactionPlayer::getCESchema() const {
+  return m_client->getCESchema();
+}
 
-  void DbClientTransactionPlayer::setFilter(const std::set<std::string>& filters) {
+  void DbClientTransactionPlayer::setFilter(const std::set<std::string>&) {
 
   }
 
@@ -127,7 +130,7 @@ namespace EUROPA {
     check_error(txCounter > 0, "Failed to find any transactions in stream.");
   }
 
-  void DbClientTransactionPlayer::play(const DbClientTransactionLogId& txLog) {
+  void DbClientTransactionPlayer::play(const DbClientTransactionLogId txLog) {
     const std::list<TiXmlElement*>& transactions = txLog->getBufferedTransactions();
     for (std::list<TiXmlElement*>::const_iterator it = transactions.begin();
          it != transactions.end();
@@ -160,7 +163,7 @@ namespace EUROPA {
     cleanup(transactions);
   }
 
-  void DbClientTransactionPlayer::rewind(const DbClientTransactionLogId& txLog,
+  void DbClientTransactionPlayer::rewind(const DbClientTransactionLogId txLog,
 					 bool breakpoint) {
     const std::list<TiXmlElement*>& transactions = txLog->getBufferedTransactions();
     while(!transactions.empty()) {
@@ -446,37 +449,36 @@ namespace EUROPA {
     checkError(ALWAYS_FAIL, "No creation transaction to complement " << element);
   }
 
-  const char* DbClientTransactionPlayer::getObjectAndType(
-          const SchemaId& schema,
-          const DbClientId& client,
-          const char* predicate,
-          ObjectId& object)
-  {
-    if (!schema->isPredicate(predicate)) {
-      LabelStr typeStr(predicate);
-      int cnt = typeStr.countElements(Schema::getDelimiter());
-      LabelStr prefix = typeStr.getElement(0, Schema::getDelimiter());
-      object = client->getObject(prefix.c_str());
-      check_error(object.isValid(), "Failed to find an object named " + prefix.toString());
-      LabelStr objType = object->getType();
-      LabelStr suffix = typeStr.getElement(1, Schema::getDelimiter());
+std::string DbClientTransactionPlayer::getObjectAndType(const SchemaId schema,
+                                                        const DbClientId client,
+                                                        const std::string& predicate,
+                                                        ObjectId& object) {
+  if (!schema->isPredicate(predicate)) {
+    std::string typeStr(predicate);
+    std::vector<std::string> components;
+    boost::split(components, typeStr, boost::is_any_of("."));
+    
+    object = client->getObject(components.front().c_str());
+    check_error(object.isValid(), "Failed to find an object named " + components.front());
 
-      for (int i=2; i<cnt;i++) {
-          objType = schema->getMemberType(objType,suffix);
-          suffix = typeStr.getElement(i, Schema::getDelimiter());
-      }
-
-      std::string objName(predicate);
-      objName = objName.substr(0,objName.length()-suffix.toString().length()-1);
-      object = client->getObject(objName.c_str());
-      check_error(object.isValid(), "Failed to find an object named " + objName);
-      LabelStr newType(objType.toString() + Schema::getDelimiter() + suffix.toString());
-      return  newType.c_str();
+    std::string objType = object->getType();
+    std::string suffix = *(components.begin() + 1);
+    for(std::vector<std::string>::const_iterator it = components.begin() + 2;
+        it != components.end(); ++it) {
+      objType = schema->getMemberType(objType,suffix);
+      suffix = *it;
     }
-    else {
-    	return predicate;
-    }
+    std::string objName(predicate);
+    objName = objName.substr(0,objName.length()-suffix.length()-1);
+    object = client->getObject(objName.c_str());
+    check_error(object.isValid(), "Failed to find an object named " + objName);
+    std::string newType(objType + Schema::getDelimiter() + suffix);
+    return  newType.c_str();
   }
+  else {
+    return predicate;
+  }
+}
 
   TokenId DbClientTransactionPlayer::createToken(
                                          const char* name,
@@ -488,9 +490,9 @@ namespace EUROPA {
     // object and specify it. We will also have to generate the appropriate type designation
     // by extracting the class from the object
     ObjectId object;
-    const char* predicateType = getObjectAndType(getSchema(),m_client,type,object);
+    std::string predicateType = getObjectAndType(getSchema(),m_client,type,object);
 
-    TokenId token = m_client->createToken(predicateType,name,rejectable,isFact);
+    TokenId token = m_client->createToken(predicateType.c_str(),name,rejectable,isFact);
 
     if (!object.isNoId()) {
         // We restrict the base domain permanently since the name is specifically mentioned on creation
@@ -524,30 +526,28 @@ namespace EUROPA {
     );
   }
 
-  void DbClientTransactionPlayer::playTokenCreated(const TiXmlElement & element) {
-    const char * relation = element.Attribute("relation");
-    if (relation != NULL) {
-      playTemporalRelationCreated(element);
-      return;
-    }
-    // simple token creation
-    TiXmlElement * child = element.FirstChildElement();
-    check_error(child != NULL);
-    const char * type = child->Attribute("type");
-    check_error(type != NULL);
-
-    const char * mandatory = element.Attribute("mandatory");
-    bool rejectable = true;
-    if(mandatory != NULL && (strcmp(mandatory, "true") == 0))
-      rejectable = false;
-
-    TokenId token = createToken(
-        child->Attribute("name"),
-        type,
-        rejectable, // rejectable
-        false       // isFact
-    );
+void DbClientTransactionPlayer::playTokenCreated(const TiXmlElement & element) {
+  const char * relation = element.Attribute("relation");
+  if (relation != NULL) {
+    playTemporalRelationCreated(element);
+    return;
   }
+  // simple token creation
+  TiXmlElement * child = element.FirstChildElement();
+  check_error(child != NULL);
+  const char * type = child->Attribute("type");
+  check_error(type != NULL);
+
+  const char * mandatory = element.Attribute("mandatory");
+  bool rejectable = true;
+  if(mandatory != NULL && (strcmp(mandatory, "true") == 0))
+    rejectable = false;
+
+  createToken(child->Attribute("name"), type,
+              rejectable, // rejectable
+              false       // isFact
+              );
+}
 
   //bizarre... playTokenCreated will, separately, create a token and create a temporal relation
   //these should be separated!
@@ -580,13 +580,13 @@ namespace EUROPA {
       std::vector<std::string> tokens;
       tokenize(pathStr, tokens, ".");
 
-      std::vector<int> path;
+      std::vector<unsigned int> path;
       for(std::vector<std::string>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
 	std::stringstream str;
 	str << *it;
-	int element;
-	str >> element;
-	path.push_back(element);
+        unsigned int pathElement = 0;
+	str >> pathElement;
+	path.push_back(pathElement);
       }
       tok = m_client->getTokenByPath(path);
     }
@@ -715,15 +715,15 @@ namespace EUROPA {
   }
 
   DbClientTransactionPlayer::TemporalRelations::iterator
-  DbClientTransactionPlayer::getTemporalConstraint(const ConstrainedVariableId& fvar,
-						   const ConstrainedVariableId& svar,
+  DbClientTransactionPlayer::getTemporalConstraint(const ConstrainedVariableId fvar,
+						   const ConstrainedVariableId svar,
 						   const std::string& name) {
     std::pair<TemporalRelations::iterator, TemporalRelations::iterator> range =
       m_relations.equal_range(std::make_pair(fvar, svar));
     checkError(range.first != m_relations.end(),
 	       "No saved temporal constraints between " << fvar->toString() << " and " <<
 	       svar->toString());
-    LabelStr relName(name);
+    std::string relName(name);
     for(TemporalRelations::iterator it = range.first; it != range.second; ++it) {
       if(it->second->getName() == relName)
 	return it;
@@ -739,8 +739,8 @@ namespace EUROPA {
     m_client->deleteConstraint(constr);
   }
 
-  void DbClientTransactionPlayer::removeTemporalConstraint(const ConstrainedVariableId& fvar,
-							   const ConstrainedVariableId& svar,
+  void DbClientTransactionPlayer::removeTemporalConstraint(const ConstrainedVariableId fvar,
+							   const ConstrainedVariableId svar,
 							   const std::string& name) {
     deleteTemporalConstraint(getTemporalConstraint(fvar, svar, name));
   }
@@ -1123,9 +1123,9 @@ namespace EUROPA {
   template<typename Iterator>
   void DbClientTransactionPlayer::playVariableUnreset(const TiXmlElement& element,
 						      Iterator start, Iterator end) {
-    TiXmlElement * var_el = element.FirstChildElement();
-    check_error(var_el != NULL);
-    ConstrainedVariableId var = xmlAsVariable(*var_el);
+    TiXmlElement * root_el = element.FirstChildElement();
+    check_error(root_el != NULL);
+    ConstrainedVariableId var = xmlAsVariable(*root_el);
 
     for(Iterator it = start; it != end; ++it) {
       if(strcmp((*it)->Value(), "specify") == 0 ||
@@ -1182,7 +1182,7 @@ namespace EUROPA {
 
     std::stringstream str;
     str << index;
-    int key;
+    unsigned int key = 0;
     str >> key;
     ConstraintId constr = m_client->getConstraintByIndex(key);
     m_client->deleteConstraint(constr);
@@ -1301,31 +1301,32 @@ namespace EUROPA {
   DbClientTransactionPlayer::parseVariable(const char * varString)
   {
     check_error(varString != NULL);
-    std::string variable = varString;
+    std::string variableName = varString;
     size_t ident_back, ident_front, variable_end;
     ident_back = 0;
-    variable_end = variable.size();
-    ident_front = variable.find('.', ident_back);
+    variable_end = variableName.size();
+    ident_front = variableName.find('.', ident_back);
     if ((ident_front == std::string::npos) || (ident_front > variable_end)) {
       // simple identifier (might be a symbol)
-      if (m_variables.find(variable) != m_variables.end()) {
-        return m_variables[variable];
-      } else {
+      if (m_variables.find(variableName) != m_variables.end()) {
+        return m_variables[variableName];
+      }
+      else {
         // presumably a symbol
         return ConstrainedVariableId::noId();
       }
     }
     // compound identifier
-    std::string ident = variable.substr(ident_back, ident_front - ident_back);
+    std::string ident = variableName.substr(ident_back, ident_front - ident_back);
     TokenId token = m_tokens[ident];
     if (token != token.noId()) {
-      std::string name = variable.substr(ident_front + 1);
-      LabelStr nameAsLabelStr(name.c_str());
+      std::string name = variableName.substr(ident_front + 1);
+      std::string nameAsLabelStr(name.c_str());
       const std::vector<ConstrainedVariableId> & variables = token->getVariables();
       std::vector<ConstrainedVariableId>::const_iterator iter = variables.begin();
       while (iter != variables.end()) {
         ConstrainedVariableId variable = *iter++;
-        const LabelStr& varName = variable->getName();
+        const std::string& varName = variable->getName();
         if (nameAsLabelStr == varName) {
           return variable;
         }
@@ -1336,7 +1337,7 @@ namespace EUROPA {
     checkError(var.isValid(), "Invalid id for " << ident);
     ObjectId object = Entity::getTypedEntity<Object>(var->lastDomain().getSingletonValue());
     checkError(object.isValid(), "Invalid object for " << ident);
-    var = object->getVariable(LabelStr(varString));
+    var = object->getVariable(varString);
     checkError(var.isValid(), varString << " not found on " << object->toString());
     return var;
   }
@@ -1366,8 +1367,8 @@ namespace EUROPA {
       return(new ObjectDomain(getCESchema()->getDataType(type), Entity::getTypedEntity<Object>(xmlAsValue(element, name))));
     }
     if (strcmp(tag, "id") == 0) {
-      const char * name = element.Attribute("name");
-      ConstrainedVariableId var = parseVariable(name);
+      const char * varName = element.Attribute("name");
+      ConstrainedVariableId var = parseVariable(varName);
       check_error(var.isValid());
       return(var->baseDomain().copy());
     }
@@ -1379,12 +1380,12 @@ namespace EUROPA {
       // New XML style for simple types.
       const char * type = element.Attribute("type");
       check_error(type != NULL, "missing type for domain in transaction XML");
-      const char * name = element.Attribute("name");
-      check_error(name != NULL, "missing name for domain in transaction XML");
+      const char * domainName = element.Attribute("name");
+      check_error(domainName != NULL, "missing name for domain in transaction XML");
 
       Domain * domain = getCESchema()->baseDomain(type).copy();
       check_error(domain != 0, "unknown type, lack of memory, or other problem with domain in transaction XML");
-      edouble value = m_client->createValue(type, name);
+      edouble value = m_client->createValue(type, domainName);
       if(domain->isOpen() && !domain->isMember(value))
 	domain->insert(value);
       domain->set(value);
@@ -1438,114 +1439,114 @@ namespace EUROPA {
     return domain;
   }
 
-  EnumeratedDomain *
-  DbClientTransactionPlayer::xmlAsEnumeratedDomain(const TiXmlElement & element,
-						   const char* otherTypeName) {
-    enum { ANY, BOOL, INT, FLOAT, STRING, SYMBOL, OBJECT } type = ANY;
-    std::string typeName;
-    // determine most specific type
-    for (TiXmlElement * child_el = element.FirstChildElement() ;
-         child_el != NULL ; child_el = child_el->NextSiblingElement()) {
-      std::string thisType;
-      if (strcmp(child_el->Value(), "value") == 0)
-        // New style XML for simple types: the type is within and tag is always 'value'
-        thisType = child_el->Attribute("type");
-      else
-        // Non-simple type or old style XML for a simple type: type is the tag and/or within (e.g., specific type is within if symbol even old style)
-        thisType = child_el->Value();
+EnumeratedDomain *
+DbClientTransactionPlayer::xmlAsEnumeratedDomain(const TiXmlElement & element,
+                                                 const char* otherTypeName) {
+  enum { ANY, BOOL, INT, FLOAT, STRING, SYMBOL, OBJECT } type = ANY;
+  std::string typeName;
+  // determine most specific type
+  for (TiXmlElement * child_el = element.FirstChildElement() ;
+       child_el != NULL ; child_el = child_el->NextSiblingElement()) {
+    std::string thisType;
+    if (strcmp(child_el->Value(), "value") == 0)
+      // New style XML for simple types: the type is within and tag is always 'value'
+      thisType = child_el->Attribute("type");
+    else
+      // Non-simple type or old style XML for a simple type: type is the tag and/or within (e.g., specific type is within if symbol even old style)
+      thisType = child_el->Value();
 
-      debugMsg("DbClientTransactionPlayer:xmlAsEnumeratedDomain", " thisType= " << thisType);
+    debugMsg("DbClientTransactionPlayer:xmlAsEnumeratedDomain", " thisType= " << thisType);
 
-      check_error(thisType != "", "no type for domain in XML");
-      if (strcmp(thisType.c_str(), "bool") == 0 ||
-          strcmp(thisType.c_str(), "BOOL") == 0 ||
-          strcmp(thisType.c_str(), BoolDT::NAME().c_str()) == 0) {
-        if (type == ANY) {
-          type = BOOL;
-          typeName = "bool";
-        }
-        if (type == BOOL)
-          continue;
+    check_error(thisType != "", "no type for domain in XML");
+    if (strcmp(thisType.c_str(), "bool") == 0 ||
+        strcmp(thisType.c_str(), "BOOL") == 0 ||
+        strcmp(thisType.c_str(), BoolDT::NAME().c_str()) == 0) {
+      if (type == ANY) {
+        type = BOOL;
+        typeName = "bool";
       }
-      if (strcmp(thisType.c_str(), "int") == 0 ||
-          strcmp(thisType.c_str(), "INT") == 0 ||
-          strcmp(thisType.c_str(), IntDT::NAME().c_str()) == 0) {
-        if (type == ANY) {
-          type = INT;
-          typeName = "int";
-        }
-        if ((type == FLOAT) || (type == INT))
-          continue;
+      if (type == BOOL)
+        continue;
+    }
+    if (strcmp(thisType.c_str(), "int") == 0 ||
+        strcmp(thisType.c_str(), "INT") == 0 ||
+        strcmp(thisType.c_str(), IntDT::NAME().c_str()) == 0) {
+      if (type == ANY) {
+        type = INT;
+        typeName = "int";
       }
-      if (strcmp(thisType.c_str(), "float") == 0 ||
-          strcmp(thisType.c_str(), "FLOAT") == 0 ||
-          strcmp(thisType.c_str(), FloatDT::NAME().c_str()) == 0) {
-        if ((type == ANY) || (type == INT)) {
-          type = FLOAT;
-          typeName = "float";
-        }
-        if (type == FLOAT)
-          continue;
+      if ((type == FLOAT) || (type == INT))
+        continue;
+    }
+    if (strcmp(thisType.c_str(), "float") == 0 ||
+        strcmp(thisType.c_str(), "FLOAT") == 0 ||
+        strcmp(thisType.c_str(), FloatDT::NAME().c_str()) == 0) {
+      if ((type == ANY) || (type == INT)) {
+        type = FLOAT;
+        typeName = "float";
       }
-      if (strcmp(thisType.c_str(), "string") == 0 ||
-          strcmp(thisType.c_str(), "STRING") == 0 ||
-          strcmp(thisType.c_str(), StringDT::NAME().c_str()) == 0) {
-        if (type == ANY) {
-          type = STRING;
-          typeName = "string";
-        }
-        if (type == STRING)
-          continue;
+      if (type == FLOAT)
+        continue;
+    }
+    if (strcmp(thisType.c_str(), "string") == 0 ||
+        strcmp(thisType.c_str(), "STRING") == 0 ||
+        strcmp(thisType.c_str(), StringDT::NAME().c_str()) == 0) {
+      if (type == ANY) {
+        type = STRING;
+        typeName = "string";
       }
-      if (strcmp(thisType.c_str(), "symbol") == 0) {
-        if (type == ANY) {
-          type = SYMBOL;
-          typeName = child_el->Attribute("type");
-        }
-        if (type == SYMBOL) {
-          check_error(strcmp(typeName.c_str(), child_el->Attribute("type")) == 0,
-                      "symbols from different types in the same enumerated set");
-          debugMsg("DbClientTransactionPlayer:xmlAsEnumeratedDomain:symbol", " thisType= " << thisType << " typeName = " <<typeName);
-          continue;
-        }
+      if (type == STRING)
+        continue;
+    }
+    if (strcmp(thisType.c_str(), "symbol") == 0) {
+      if (type == ANY) {
+        type = SYMBOL;
+        typeName = child_el->Attribute("type");
+      }
+      if (type == SYMBOL) {
+        check_error(strcmp(typeName.c_str(), child_el->Attribute("type")) == 0,
+                    "symbols from different types in the same enumerated set");
         debugMsg("DbClientTransactionPlayer:xmlAsEnumeratedDomain:symbol", " thisType= " << thisType << " typeName = " <<typeName);
+        continue;
       }
-//      if (strcmp(thisType.c_str(), "object") == 0) {
-//        if (type == ANY) {
-//          type = OBJECT;
-//        }
-//        if (type == OBJECT)
-//          //!!This needs a similar type check to SYMBOL, just above (but more complex due to inheritance?)
-//          continue;
-//      }
-      check_error(ALWAYS_FAILS, "unknown or inappropriately mixed type(s) for value(s) in an enumerated set");
+      debugMsg("DbClientTransactionPlayer:xmlAsEnumeratedDomain:symbol", " thisType= " << thisType << " typeName = " <<typeName);
     }
-    check_error(type != ANY);
-    // gather the values
-    std::list<edouble> values;
-    for (TiXmlElement * child_el = element.FirstChildElement() ;
-         child_el != NULL ; child_el = child_el->NextSiblingElement()) {
-      const char * value_st = child_el->Attribute("value");
-      if (value_st == NULL) // Check for the new style XML for simple types
-        value_st = child_el->Attribute("name");
-      check_error(value_st != NULL);
-      switch (type) {
-       case BOOL: case INT: case FLOAT: case STRING: case SYMBOL:
-         values.push_back(m_client->createValue(typeName.c_str(), value_st));
-         break;
-       case OBJECT:
-         values.push_back(m_client->getObject(value_st)->getKey());
-         break;
-       default:
-         check_error(ALWAYS_FAILS);
-      }
-    }
-
-    // return the domain
-    if (otherTypeName != NULL)
-        typeName = otherTypeName;
-
+    //      if (strcmp(thisType.c_str(), "object") == 0) {
+    //        if (type == ANY) {
+    //          type = OBJECT;
+    //        }
+    //        if (type == OBJECT)
+    //          //!!This needs a similar type check to SYMBOL, just above (but more complex due to inheritance?)
+    //          continue;
+    //      }
+    check_error(ALWAYS_FAILS, "unknown or inappropriately mixed type(s) for value(s) in an enumerated set");
+  }
+  check_error(type != ANY);
+  // gather the values
+  std::list<edouble> values;
+  for (TiXmlElement * child_el = element.FirstChildElement() ;
+       child_el != NULL ; child_el = child_el->NextSiblingElement()) {
+    const char * value_st = child_el->Attribute("value");
+    if (value_st == NULL) // Check for the new style XML for simple types
+      value_st = child_el->Attribute("name");
+    check_error(value_st != NULL);
     switch (type) {
+      case BOOL: case INT: case FLOAT: case STRING: case SYMBOL:
+        values.push_back(m_client->createValue(typeName.c_str(), value_st));
+        break;
+      case OBJECT:
+        values.push_back(m_client->getObject(value_st)->getKey());
+        break;
+      case ANY:
+        check_error(ALWAYS_FAILS);
+    }
+  }
+
+  // return the domain
+  if (otherTypeName != NULL)
+    typeName = otherTypeName;
+
+  switch (type) {
     case BOOL: case INT: case FLOAT:
       return(new EnumeratedDomain(getCESchema()->getDataType(typeName.c_str()),values));
     case STRING:
@@ -1554,11 +1555,12 @@ namespace EUROPA {
       return(new SymbolDomain(values,getCESchema()->getDataType(typeName.c_str())));
     case OBJECT:
       return(new EnumeratedDomain(getCESchema()->getDataType(typeName.c_str()),values));
-    default:
+    case ANY:
       check_error(ALWAYS_FAILS);
       return(0);
-    }
   }
+  check_error(ALWAYS_FAILS);
+}
 
   edouble DbClientTransactionPlayer::xmlAsValue(const TiXmlElement & value, const char * name) {
     const char * tag = value.Value();
@@ -1583,10 +1585,10 @@ namespace EUROPA {
 
       // Now deallocate domains created for arguments
       for (std::vector<const Domain*>::const_iterator it = arguments.begin(); it != arguments.end(); ++it) {
-      	Domain* tmp = (Domain*)(*it);
+      	Domain* tmp = const_cast<Domain*>(*it);
         delete tmp;
       }
-      return (edouble)object->getKey();
+      return static_cast<edouble>(object->getKey());
     }
     if (strcmp(tag, "value") == 0) {
       // New style XML for simple types.
@@ -1633,20 +1635,20 @@ namespace EUROPA {
       if (token_path != NULL) {
         TokenId token = m_client->getTokenByPath(pathAsVector(token_path));
         check_error(token.isValid());
-        check_error((unsigned)index < token->getVariables().size());
-        return token->getVariables()[index];
+        check_error(static_cast<unsigned>(index) < token->getVariables().size());
+        return token->getVariables()[static_cast<unsigned>(index)];
       }
 
       const char * object_name = variable.Attribute("object");
       if (object_name != NULL) {
         ObjectId object = m_client->getObject(object_name);
         check_error(object.isValid());
-        check_error((unsigned)index < object->getVariables().size());
-        return object->getVariables()[index];
+        check_error(static_cast<unsigned>(index) < object->getVariables().size());
+        return object->getVariables()[static_cast<unsigned>(index)];
       }
 
       // rule variables
-      return m_client->getVariableByIndex(index);
+      return m_client->getVariableByIndex(static_cast<unsigned>(index));
     }
 
     ConstrainedVariableId var = xmlAsCreateVariable(NULL, NULL, &variable);

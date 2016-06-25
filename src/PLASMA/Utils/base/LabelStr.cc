@@ -30,19 +30,17 @@ namespace EUROPA {
     return(sl_stringFromKeys);
   }
 
-  LabelStr::LabelStr() {
-    std::string empty("");
-    m_key = getKey(empty);
-#ifndef EUROPA_FAST
-    m_chars = empty.c_str();
-#endif
-  }
+LabelStr::LabelStr() : m_key(0) {
+  std::string empty("");
+  m_key = getKey(empty);
+}
 
-  pthread_mutex_t& LabelStrMutex()
-  {
-      static pthread_mutex_t sl_mutex = PTHREAD_MUTEX_INITIALIZER;
-      return sl_mutex;      
-  }
+namespace {
+pthread_mutex_t& LabelStrMutex() {
+  static pthread_mutex_t sl_mutex = PTHREAD_MUTEX_INITIALIZER;
+  return sl_mutex;      
+}
+}
   
   
   /**
@@ -50,30 +48,19 @@ namespace EUROPA {
    * calculations in the domain and must maintain the ordering defined
    * by the strings.
    */
-  LabelStr::LabelStr(const std::string& label) {
-    m_key = getKey(label);
+LabelStr::LabelStr(const std::string& label) : m_key(0) {
+  m_key = getKey(label);
+}
 
-#ifndef EUROPA_FAST
-    m_chars = label.c_str();
-#endif
-  }
+LabelStr::LabelStr(const char* label) : m_key(0) {
+  std::string str(label);
+  m_key = getKey(label);
+}
 
-  LabelStr::LabelStr(const char* label) {
-    std::string str(label);
-    m_key = getKey(label);
-
-#ifndef EUROPA_FAST
-    m_chars = label;
-#endif
-  }
-
-  LabelStr::LabelStr(edouble key)
+LabelStr::LabelStr(edouble key)
     : m_key(key) {
-    check_error(isString(m_key), "Invalid key provided.");
-
-#ifndef EUROPA_FAST
-    m_chars = toString().c_str();
-#endif
+  check_error(isString(m_key), "Invalid key provided.");
+  
   }
 
   const std::string& LabelStr::toString() const {
@@ -88,7 +75,6 @@ namespace EUROPA {
 
   LabelStr::LabelStr(const LabelStr& org)
     : m_key(org.m_key) {
-    m_chars = org.m_chars;
   }
 
   LabelStr::operator edouble () const {
@@ -113,10 +99,9 @@ namespace EUROPA {
     return m_key != lbl.m_key;
   }
 
-  unsigned int LabelStr::getSize() {
+  unsigned long LabelStr::getSize() {
     check_error(keysFromString().size() == stringFromKeys().size());
-    int toRet = keysFromString().size();
-    return toRet;
+    return keysFromString().size();
   }
 
   edouble LabelStr::getKey(const std::string& label) {
@@ -168,12 +153,12 @@ namespace EUROPA {
 
   bool LabelStr::contains(const LabelStr& lblStr) const{
     const std::string& thisStr = toString();
-    int index = thisStr.find(lblStr.c_str());
-    return (index >= 0);
+    std::string::size_type index = thisStr.find(lblStr.c_str());
+    return index != std::string::npos;
   }
 
 
-  unsigned int LabelStr::countElements(const char* delimiter) const{
+  unsigned long LabelStr::countElements(const char* delimiter) const{
     check_error(delimiter != NULL && delimiter != 0 && delimiter[0] != '\0', "'NULL' and '\\0' are not valid delimiters");
 
     //allocate a results vector
@@ -190,7 +175,7 @@ namespace EUROPA {
     return tokens.size();
   }
 
-  LabelStr LabelStr::getElement(unsigned int index, const char* delimiter) const{
+  LabelStr LabelStr::getElement(unsigned long index, const char* delimiter) const{
     check_error(delimiter != NULL && delimiter != 0 && delimiter[0] != '\0', "'NULL' and '\\0' are not valid delimiters");
 
     //allocate a results vector

@@ -11,10 +11,9 @@
 //  ownership of the software is hereby transferred.  This notice shall
 //  remain on all copies of the software.
 
-#ifndef _H_ID
-#define _H_ID
+#ifndef H_ID
+#define H_ID
 
-#include "CommonDefs.hh"
 #include "IdTable.hh"
 #include "Error.hh"
 #include <typeinfo>
@@ -120,82 +119,97 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @param ptr The pointer to create a new Id for.
      * @see Id::noId()
      */
-    inline Id(T* ptr) {
+    inline Id(T* ptr) : m_ptr(ptr) 
 #ifndef EUROPA_FAST
-      check_error(ptr != 0, std::string("Cannot generate an Id<") + typeid(T).name() + "> for 0 pointer.",
+		      , m_key(0)
+#endif
+    {
+#ifndef EUROPA_FAST
+      check_error(ptr != 0,
+		  std::string("Cannot generate an Id<") + typeid(T).name() + "> for 0 pointer.",
                   IdErr::IdMgrInvalidItemPtrError());
-      m_key = IdTable::insert((unsigned long int)(ptr), typeid(T).name());
-      check_error(m_key != 0, std::string("Cannot generate an Id<") + typeid(T).name() + "> for a pointer that has not been cleaned up.",
+      m_key = IdTable::insert(reinterpret_cast<unsigned long int>(ptr),
+			      typeid(T).name());
+      check_error(m_key != 0, 
+		  std::string("Cannot generate an Id<") + typeid(T).name() + "> for a pointer that has not been cleaned up.",
                   IdErr::IdMgrInvalidItemPtrError());
 #endif
-      m_ptr = ptr;
     }
 
     /**
      * @brief Copy constructor.
      * @param org The constant reference to original Id from which to copy.
      */
-    inline Id(const Id& org) {
-      m_ptr = org.m_ptr;
+    inline Id(const Id& org) : m_ptr(org.m_ptr)
 #ifndef EUROPA_FAST
-      m_key = org.m_key;
+			     , m_key(org.m_key)
 #endif
-    }
+    {}
 
-    /**
-     * @brief Default Constructor. Results in an object equal to noId().
-     * @see Id::noId()
-     */
-    inline Id() {
-      m_ptr = 0;
+
+      /**
+       * @brief Default Constructor. Results in an object equal to noId().
+       * @see Id::noId()
+       */
+      inline Id() : m_ptr(NULL)
 #ifndef EUROPA_FAST
-      m_key = 0;
+		  , m_key(0)
 #endif
-    }
+    {}
 
-    /**
-     * @brief Permit type casting of eints on construction.
-     * @param val An eint value encoding of the address of the instance to be pointed to.
-     * Must be 0, or an address for which an Id has already been allocated.
-     */
-    inline Id(double val) {
+	/**
+	 * @brief Permit type casting of eints on construction.
+	 * @param val An eint value encoding of the address of the instance to be pointed to.
+	 * Must be 0, or an address for which an Id has already been allocated.
+	 */
+	inline Id(double val) : m_ptr(NULL)
+#ifndef EUROPA_FAST
+			    , m_key(0)
+#endif
+    {
 #ifndef EUROPA_FAST
       if (val == 0)
         m_key = 0;
       else {
-        m_key = IdTable::getKey((unsigned long int) val);
+        m_key = IdTable::getKey(static_cast<unsigned long int>(val));
         checkError(m_key != 0,
                    "Cannot instantiate an Id<" << typeid(T).name() << "> for this address: "  <<
-                   std::hex << (unsigned long int) val << ". No instance present.",
+                   std::hex << static_cast<unsigned long int>(val) << ". No instance present.",
                    IdErr::IdMgrInvalidItemPtrError());
       }
 #endif
-      m_ptr = (T*) (unsigned long int) val;
+      m_ptr = static_cast<T*>(static_cast<unsigned long int>(val));
     }
 
 
-    inline Id(const unsigned long int val) {
+			       inline Id(const unsigned long int val) : m_ptr(reinterpret_cast<T*>(val))
 #ifndef EUROPA_FAST
-      if (val == 0)
-        m_key = 0;
-      else {
-        m_key = IdTable::getKey(val);
-        checkError(m_key != 0,
-                   "Cannot instantiate an Id<" << typeid(T).name() << "> for this address: "  <<
-                   std::hex << val << ". No instance present.", IdErr::IdMgrInvalidItemPtrError());
+      , m_key(0)
+#endif
+    {
+#ifndef EUROPA_FAST
+    if(val != 0) {
+    m_key = IdTable::getKey(val);
+    checkError(m_key != 0,
+      "Cannot instantiate an Id<" << typeid(T).name() << "> for this address: "  <<
+	       std::hex << val << ". No instance present.",
+	       IdErr::IdMgrInvalidItemPtrError());
       }
 #endif
-      m_ptr = (T*) val;
-    }
+}
     /**
      * @brief Copy constructor from an Id of a different type.
      * @param org The constant reference to original Id from which to copy.
      * @note Must be able to cast from X* to T*.
      */
-    template <class X>
-    inline Id(const Id<X>& org) {
-      copyAndCastFromId(org);
-    }
+template <class X>
+inline Id(const Id<X>& org) : m_ptr(NULL)
+#ifndef EUROPA_FAST
+			    , m_key(0)
+#endif
+{
+  copyAndCastFromId(org);
+}
 
     /**
      * @brief Cast the pointer to an int.
@@ -210,7 +224,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @param org The constant reference to original Id to be assigned to.
      * @return A reference to self.
      */
-    inline Id& operator=(const Id& org) {
+    inline Id& operator=(const Id org) {
       m_ptr = org.m_ptr;
 #ifndef EUROPA_FAST
       m_key = org.m_key;
@@ -220,7 +234,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
 
     /**
      * @brief Equality test for mixed types. No casting used
-     * @param An Id of a possibly different type.
+     * @param org An Id of a possibly different type.
      * @return true if the addresses match
      */
     template <class X>
@@ -236,7 +250,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
     template <class X>
     inline Id& operator=(const Id<X>& org) {
       copyAndCastFromId(org);
-      return(*this);
+      return *this;
     }
 
     /**
@@ -279,7 +293,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @brief Handy static method to check for the "empty" id.
      * @return A reference to an Id created as Id(). This is a static member of the class.
      */
-    static inline const Id& noId() {
+    static inline const Id noId() {
       static const Id s_noId;
       return(s_noId);
     }
@@ -316,7 +330,8 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      */
     inline bool isValid() const {
 #ifndef EUROPA_FAST
-      return(m_ptr != 0 && m_key != 0 && IdTable::getKey((unsigned long int)m_ptr) == m_key);
+      return(m_ptr != 0 && m_key != 0 &&
+             IdTable::getKey(reinterpret_cast<unsigned long>(m_ptr)) == m_key);
 #else
       return(m_ptr != 0);
 #endif
@@ -340,7 +355,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @return true if the Id's point to the same pointer, and have the same key (non fast version only).
      * @see Id::isValid()
      */
-    inline bool operator==(const Id& comp) const {
+    inline bool operator==(const Id comp) const {
 #ifndef EUROPA_FAST
       return(m_ptr == comp.m_ptr && m_key == comp.m_key);
 #else
@@ -353,7 +368,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @param comp The Id to be compared against.
      * @return false if ==, true otherwise.
      */
-    inline bool operator!=(const Id& comp) const {
+    inline bool operator!=(const Id comp) const {
 #ifndef EUROPA_FAST
       return (!(operator==(comp)));
 #else
@@ -366,7 +381,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @param comp The Id to be compared against.
      * @return true if the address of this object is greater than comp.
      */
-    inline bool operator>(const Id& comp) const {
+    inline bool operator>(const Id comp) const {
       return(m_ptr > comp.m_ptr);
     }
 
@@ -375,7 +390,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
      * @param comp The Id to be compared against.
      * @return true if the address of this object is less than comp.
      */
-    inline bool operator<(const Id& comp) const {
+    inline bool operator<(const Id comp) const {
       return(m_ptr < comp.m_ptr);
     }
 
@@ -406,7 +421,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
       check_error(isValid(), std::string("Cannot release an invalid Id<") + typeid(T).name() + ">.",
                   IdErr::IdMgrInvalidItemPtrError());
       m_key = 0;
-      IdTable::remove((unsigned long int) ptr);
+      IdTable::remove(reinterpret_cast<unsigned long int>(ptr));
 #endif
       m_ptr = 0;
       delete ptr;
@@ -421,7 +436,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
 #ifndef EUROPA_FAST
       check_error(isValid(), std::string("Cannot remove an invalid Id<") + typeid(T).name() + ">.",
                   IdErr::IdMgrInvalidItemPtrError());
-      IdTable::remove((unsigned long int) m_ptr);
+      IdTable::remove(reinterpret_cast<unsigned long int>(m_ptr));
       m_key = 0;
 #endif
       m_ptr = 0;
@@ -439,7 +454,7 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
       }
       check_error(Id<T>::convertable(org), std::string("Invalid cast from Id<") + typeid(X).name() + "> to Id<" + typeid(T).name() + ">.",
                   IdErr::IdMgrInvalidItemPtrError());
-      m_key = IdTable::getKey((unsigned long int) m_ptr);
+      m_key = IdTable::getKey(reinterpret_cast<unsigned long int>(m_ptr));
       check_error(m_key != 0, std::string("Cannot create an Id<") + typeid(X).name() + "> for this address since no instance is present.",
                   IdErr::IdMgrInvalidItemPtrError());
 #endif
@@ -463,6 +478,11 @@ Baz* baz = (Baz*) fooId; // Will not compile.@endverbatim
     id.print(outStream);
     return(outStream);
   }
+
+template<typename T, typename U>
+T* id_cast(Id<U> i) {
+  return dynamic_cast<T*>(static_cast<U*>(i));
+}
 
 } // End namespace
 

@@ -5,22 +5,19 @@
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 
-using namespace std;
 
 // This version available to to NDDL module-tests.cc which does a special-case
 // construction of the runner
 #define RUN_CPP_UNIT_RUNNER(runner, useLogFile) { \
-    ofstream* os = NULL; \
+    std:: ofstream* os = NULL;                     \
     if(useLogFile) { \
-        os = new ofstream("cppunit-results.xml"); \
+      os = new std::ofstream("cppunit-results.xml");    \
         CppUnit::XmlOutputter* outputter = \
            new CppUnit::XmlOutputter(&runner.result(), *os); \
         runner.setOutputter(outputter); \
     } \
     bool success = runner.run("", false); \
-    if(os != NULL) { \
-         delete os; \
-    } \
+    delete os;                            \
     return success ? 0 : 1; \
 }
 

@@ -8,18 +8,18 @@
 #ifndef TIXML_USE_STL
 #define TIXML_USE_STL
 #endif
-
-#include "tinyxml.h"
-#include "LabelStr.hh"
+#include <cstddef>
+#include <string>
 
 namespace EUROPA {
+class TiXmlElement;
 
 #define IS_TAG(x) (strcmp (tagName, x) == 0)
 
   /**
    * @brief Utility to extract an argument from an xml element
    */
-  LabelStr extractData(const TiXmlElement& element, const LabelStr& argName);
+  std::string extractData(const TiXmlElement& element, const std::string& argName);
 
   /**
    * @brief Helper method to get the first xml element in the file

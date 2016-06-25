@@ -3,34 +3,34 @@
 #include "DomainListener.hh"
 #include "ConstrainedVariable.hh"
 #include "ConstraintType.hh"
-#include "LabelStr.hh"
 #include "Rule.hh"
 
 namespace EUROPA {
 
-  RuleVariableListener::RuleVariableListener(const LabelStr& name,
-					     const LabelStr& propagatorName,
-					     const ConstraintEngineId& constraintEngine,
-					     const std::vector<ConstrainedVariableId>& scope)
-    : Constraint(name, propagatorName, constraintEngine, scope){}
+RuleVariableListener::RuleVariableListener(const std::string& name,
+                                           const std::string& propagatorName,
+                                           const ConstraintEngineId constraintEngine,
+                                           const std::vector<ConstrainedVariableId>& scope)
+    : Constraint(name, propagatorName, constraintEngine, scope), m_ruleInstance(), 
+      m_sourceConstraint() {}
 
 
-  RuleVariableListener::RuleVariableListener(const ConstraintEngineId& constraintEngine,
-					     const RuleInstanceId& ruleInstance,
-					     const std::vector<ConstrainedVariableId>& scope)
+RuleVariableListener::RuleVariableListener(const ConstraintEngineId constraintEngine,
+                                           const RuleInstanceId ruleInstance,
+                                           const std::vector<ConstrainedVariableId>& scope)
     : Constraint(CONSTRAINT_NAME(), PROPAGATOR_NAME(), constraintEngine, scope),
-      m_ruleInstance(ruleInstance){
-    check_error(! m_ruleInstance->isExecuted(),
-		"A Rule Instance should never be already executed when we construct the constraint!");
+      m_ruleInstance(ruleInstance), m_sourceConstraint() {
+  check_error(! m_ruleInstance->isExecuted(),
+              "A Rule Instance should never be already executed when we construct the constraint!");
 
-    // Add rule variable listener as a dependent of the rule instance to receive discard notifications
-    m_ruleInstance->addDependent(this);
-  }
+  // Add rule variable listener as a dependent of the rule instance to receive discard notifications
+  m_ruleInstance->addDependent(this);
+}
 
   /**
    * @see Mergemento::merge
    */
-  void RuleVariableListener::setSource(const ConstraintId& sourceConstraint){
+  void RuleVariableListener::setSource(const ConstraintId sourceConstraint){
     check_error(sourceConstraint.isValid());
 
     checkError(sourceConstraint->getName() == getName(),
@@ -44,27 +44,27 @@ namespace EUROPA {
    * so that rule execution is not subject to the vagaries of propagtion timing
    * @return true
    */
-  bool RuleVariableListener::canIgnore(const ConstrainedVariableId& variable,
-				       int argIndex,
-				       const DomainListener::ChangeType& changeType){
-    checkError(getRuleInstance().isValid(), getKey() << " has lost its rule instance:" << getRuleInstance());
+bool RuleVariableListener::canIgnore(const ConstrainedVariableId,
+                                     unsigned int,
+                                     const DomainListener::ChangeType&){
+  checkError(getRuleInstance().isValid(), getKey() << " has lost its rule instance:" << getRuleInstance());
 
-    if(getRuleInstance().isNoId())
-      return true;
+  if(getRuleInstance().isNoId())
+    return true;
 
-    debugMsg("RuleVariableListener:canIgnore",
-    		"Checking canIgnore for guard listener for rule " << getRuleInstance()->getRule()->getName().toString() <<
-    		" from source " << (m_sourceConstraint.isId() ? m_sourceConstraint->getName().toString() : "NULL"));
+  debugMsg("RuleVariableListener:canIgnore",
+           "Checking canIgnore for guard listener for rule " << getRuleInstance()->getRule()->getName() <<
+           " from source " << (m_sourceConstraint.isId() ? m_sourceConstraint->getName() : "NULL"));
 
-    return false;
-  }
+  return false;
+}
 
-  const RuleInstanceId& RuleVariableListener::getRuleInstance() {
+  const RuleInstanceId RuleVariableListener::getRuleInstance() {
     if(m_ruleInstance.isNoId()){
       checkError(m_sourceConstraint.isValid(), "Must be able to get this from a source constraint.");
 
       // Now obtain the rule instance from the source
-      RuleVariableListener* source = (RuleVariableListener*) m_sourceConstraint;
+      RuleVariableListener* source = id_cast<RuleVariableListener>(m_sourceConstraint);
       m_ruleInstance = source->getRuleInstance();
 
       checkError(m_ruleInstance.isNoId() || m_ruleInstance.isValid(), m_sourceConstraint->toString());
@@ -111,7 +111,7 @@ namespace EUROPA {
    * @brief If the base class test passes, then we need to see if there is any more information contained in the rule that
    * has not been applied. This will be the case if the rule has not fired yet and the test indicates it could.
    */
-  bool RuleVariableListener::testIsRedundant(const ConstrainedVariableId& var) const{
+  bool RuleVariableListener::testIsRedundant(const ConstrainedVariableId var) const{
     return Constraint::testIsRedundant(var) && (m_ruleInstance.isNoId() || m_ruleInstance->isExecuted() || !m_ruleInstance->test(getScope()));
   }
 }

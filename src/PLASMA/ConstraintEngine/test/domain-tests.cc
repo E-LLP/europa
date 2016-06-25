@@ -2,11 +2,135 @@
 #include "LabelStr.hh"
 #include "Domains.hh"
 #include "DomainListener.hh"
+#include "TestUtils.hh"
 #include "module-tests.hh"
 #include <sstream>
 #include <cmath>
 
 namespace EUROPA {
+
+namespace {
+class DummyDT : public DataType {
+ public:
+  DummyDT();
+  virtual ~DummyDT() {}
+  
+  bool isNumeric() const {return true;}
+  bool isBool() const {return false;}
+  bool isString() const {return false;}
+
+  edouble createValue(const std::string& ) const {return 1.0;}
+  
+  static const std::string& NAME() {
+    static std::string sl_name("DummyDT"); 
+    return sl_name;
+  }
+  static const DataTypeId instance();
+  
+};
+}
+
+class DummyDomain : public Domain {
+ public:
+  DummyDomain(const DataTypeId id = DummyDT::instance()) : Domain(id, false, true) {}
+  bool isEmpty() const {return false;}
+  bool isFinite() const {return true;}
+  bool isSingleton() const {return true;}
+  size_type getSize() const {return 1;}
+  edouble getUpperBound() const {return 1.0;}
+  edouble getLowerBound() const {return 1.0;}
+  bool getBounds(edouble& lb, edouble& ub) const {lb = getLowerBound(); ub = getUpperBound(); return false;}
+  void getValues(std::list<edouble>& results) const {results.clear(); results.push_back(1.0);}
+  edouble getSingletonValue() const {return 1.0;}
+  void empty() {}
+  void set(edouble) {}
+  void reset(const Domain&) {}
+  void relax(const Domain&) {}
+  void relax(edouble ) {}
+  void insert(edouble ) {}
+  void insert(const std::list<edouble>& ) {}
+  void remove(edouble ) {}
+  bool intersect(const Domain& ) {return false;}
+  bool intersect(const edouble , const edouble ) {return false;}
+  bool difference(const Domain& ) {return false;}
+  bool equate(Domain& ) {return false;}
+  bool isMember(edouble value) const {return value == 1.0;}
+  bool isSubsetOf(const Domain& dom) const {return dom.isMember(1.0);}
+  bool intersects(const Domain& dom) const {return isSubsetOf(dom);}
+  Domain* copy() const;
+  bool convertToMemberValue(const std::string& , edouble& ) const {
+    return false;
+  }
+  void testPrecision(const edouble& ) const {}
+ private:
+};
+
+Domain* DummyDomain::copy() const {return new DummyDomain(DummyDT::instance());}
+
+const DataTypeId DummyDT::instance() { 
+  static DummyDT sl_instance; 
+  return sl_instance.getId(); 
+}
+
+DummyDT::DummyDT() : DataType(DummyDT::NAME().c_str()) {
+  m_minDelta = 0.5;
+  m_baseDomain = new DummyDomain(getId());
+}
+
+class IntrinsicsTest {
+ public:
+  static bool test() {
+    unused(DataTypeId dt) = DummyDT::instance();
+    EUROPA_runTest(lessThanTest);
+    EUROPA_runTest(equalTest);
+    EUROPA_runTest(lessThanOrEqualTest);
+    return true;
+  };
+  static bool lessThanTest() {
+    DummyDomain dom;
+    CPPUNIT_ASSERT(dom.minDelta() == 0.5);
+    CPPUNIT_ASSERT(dom.lt(0.0, 0.5));
+    CPPUNIT_ASSERT(!dom.lt(0.0, 0.4));
+    CPPUNIT_ASSERT(dom.lt(0.0, 0.6));
+    CPPUNIT_ASSERT(!dom.lt(0.0, 0.0));
+
+    CPPUNIT_ASSERT(dom.lt(1.0, 1.5));
+    CPPUNIT_ASSERT(!dom.lt(1.0, 1.4));
+    CPPUNIT_ASSERT(dom.lt(1.0, 1.6));
+    CPPUNIT_ASSERT(!dom.lt(1.0, 1.0));
+
+    return true;
+  }
+
+  static bool equalTest() {
+    DummyDomain dom;
+    CPPUNIT_ASSERT(dom.eq(0.0, 0.0));
+    CPPUNIT_ASSERT(!dom.eq(0.0, 0.5));
+    CPPUNIT_ASSERT(dom.eq(0.0, 0.4));
+    CPPUNIT_ASSERT(!dom.eq(0.0, 0.6));
+
+    CPPUNIT_ASSERT(dom.eq(1.0, 1.0));
+    CPPUNIT_ASSERT(!dom.eq(1.0, 1.5));
+    CPPUNIT_ASSERT(dom.eq(1.0, 1.4));
+    CPPUNIT_ASSERT(!dom.eq(1.0, 1.6));
+    return true;
+  }
+  static bool lessThanOrEqualTest() {
+    DummyDomain dom;
+    CPPUNIT_ASSERT(dom.leq(0.0, 0.5));
+    CPPUNIT_ASSERT(dom.leq(0.0, 0.4));
+    CPPUNIT_ASSERT(dom.leq(0.0, 0.6));
+    CPPUNIT_ASSERT(dom.leq(0.0, 0.0));
+    CPPUNIT_ASSERT(!dom.leq(0.5, 0.0));
+
+    CPPUNIT_ASSERT(dom.leq(1.0, 1.5));
+    CPPUNIT_ASSERT(dom.leq(1.0, 1.4));
+    CPPUNIT_ASSERT(dom.leq(1.0, 1.6));
+    CPPUNIT_ASSERT(dom.leq(1.0, 1.0));
+    CPPUNIT_ASSERT(!dom.leq(1.5, 1.0));
+    return true;
+  }
+};
 
   class ChangeListener : public DomainListener {
   public:
@@ -62,7 +186,8 @@ namespace EUROPA {
       IntervalDomain realDomain(10.2 ,20.4);
       CPPUNIT_ASSERT(!realDomain.isEmpty());
       CPPUNIT_ASSERT(!realDomain.isFinite());
-      CPPUNIT_ASSERT_EQUAL((Domain::size_type) cast_int(PLUS_INFINITY), realDomain.getSize());
+      CPPUNIT_ASSERT_EQUAL(static_cast<Domain::size_type>(cast_int(PLUS_INFINITY)),
+                           realDomain.getSize());
 
       IntervalIntDomain intDomain(10, 20);
       CPPUNIT_ASSERT(intDomain.isFinite());
@@ -842,7 +967,7 @@ namespace EUROPA {
     }
 
     static bool testBasicLabelOperations() {
-      int initialCount = EUROPA::LabelStr::getSize();
+      unsigned long initialCount = EUROPA::LabelStr::getSize();
       EUROPA::LabelStr dt_l1("DT_L1");
       EUROPA::LabelStr dt_l2("DT_L2");
       EUROPA::LabelStr dt_l3("DT_L3");
@@ -1429,7 +1554,7 @@ namespace EUROPA {
 
       copyPtr = customDom.copy();
       CPPUNIT_ASSERT(copyPtr->isBool());
-      CPPUNIT_ASSERT(copyPtr->getTypeName().toString() == BoolDT::NAME());
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == BoolDT::NAME());
       CPPUNIT_ASSERT((dynamic_cast<BoolDomain*>(copyPtr))->isTrue());
       CPPUNIT_ASSERT(!(dynamic_cast<BoolDomain*>(copyPtr))->isFalse());
       delete copyPtr;
@@ -1456,7 +1581,7 @@ namespace EUROPA {
       NumericDomain oneDom(2.7); // Singletn
 
       copyPtr = emptyOpen.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(copyPtr->isEnumerated());
@@ -1468,7 +1593,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = fourDom.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isEnumerated());
       copyPtr->close();
@@ -1477,7 +1602,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = fiveDom.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isEnumerated());
       CPPUNIT_ASSERT(copyPtr->getSize() == 5);
@@ -1485,7 +1610,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = oneDom.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isEnumerated());
       CPPUNIT_ASSERT(copyPtr->isSingleton());
@@ -1510,7 +1635,7 @@ namespace EUROPA {
       // Domains containing infinities should also be tested.
 
       copyPtr = empty.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1531,7 +1656,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = one2ten.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("float"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "float");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1550,7 +1675,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = four.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName().toString() == IntDT::NAME());
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == IntDT::NAME());
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1584,7 +1709,7 @@ namespace EUROPA {
       // domains containing infinities should also be tested
 
       copyPtr = empty.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("int"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "int");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1605,7 +1730,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = one2ten.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName() == LabelStr("int"));
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == "int");
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1626,7 +1751,7 @@ namespace EUROPA {
       delete copyPtr;
 
       copyPtr = four.copy();
-      CPPUNIT_ASSERT(copyPtr->getTypeName().toString() == IntDT::NAME());
+      CPPUNIT_ASSERT(copyPtr->getTypeName() == IntDT::NAME());
       CPPUNIT_ASSERT(!copyPtr->isOpen());
       CPPUNIT_ASSERT(copyPtr->isNumeric());
       CPPUNIT_ASSERT(!copyPtr->isEnumerated());
@@ -1656,7 +1781,7 @@ namespace EUROPA {
     public:
       BogusComparator(): DomainComparator(){}
 
-      bool canCompare(const Domain& domx, const Domain& domy) const {
+      bool canCompare(const Domain& , const Domain&) const {
 	return false;
       }
 
@@ -1813,6 +1938,7 @@ bool DomainTests::test() {
   /*runTestSuite(EUROPA::IntervalDomainTest::test);
   runTestSuite(EUROPA::EnumeratedDomainTest::test);
   runTestSuite(EUROPA::MixedTypeTest::test);*/
+  EUROPA::IntrinsicsTest::test();
   EUROPA::IntervalDomainTest::test();
   EUROPA::EnumeratedDomainTest::test();
   EUROPA::MixedTypeTest::test();

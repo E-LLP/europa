@@ -1,5 +1,5 @@
-#ifndef _H_Utils
-#define _H_Utils
+#ifndef H_Utils
+#define H_Utils
 
 /**
  * @file   Utils.hh
@@ -20,34 +20,9 @@
 #include <list>
 #include <string>
 #include <cmath>
-#include <limits>
 #include <sstream>
 
 namespace EUROPA {
-
-  /**
-   * Utility class that might get promoted later.
-   */
-  class Infinity {
-  public:
-    static edouble plus(edouble n1, edouble n2, edouble defaultValue) {
-      if (std::abs(n1) >= PLUS_INFINITY || std::abs(n2) >= PLUS_INFINITY)
-	return(defaultValue);
-      edouble retval = n1 + n2;
-      if(std::abs(retval) >= PLUS_INFINITY)
-	return defaultValue;
-      return retval;
-    }
-
-    static edouble minus(edouble n1, edouble n2, edouble defaultValue) {
-      if (std::abs(n1) >= PLUS_INFINITY || std::abs(n2) >= PLUS_INFINITY)
-	return(defaultValue);
-      edouble retval = n1 - n2;
-      if(std::abs(retval) >= PLUS_INFINITY)
-	return defaultValue;
-      return retval;
-    }
-  };
 
   /**
    * @brief Utility to produce a string from a double
@@ -121,7 +96,7 @@ namespace EUROPA {
     object_iterator it = objects.begin();
     while(it != objects.end()){
       check_error((*it).isValid());
-      delete (TYPE*) (*it++);
+      delete static_cast<TYPE*>(*it++);
     }
     objects.clear();
   }
@@ -132,7 +107,7 @@ namespace EUROPA {
     object_iterator it = objects.begin();
     while(it != objects.end()){
       check_error((*it).isValid());
-      delete (TYPE*) (*it++);
+      delete static_cast<TYPE*>(*it++);
     }
     objects.clear();
   }
@@ -143,7 +118,7 @@ namespace EUROPA {
     object_iterator it = objects.begin();
     while(it != objects.end()){
       check_error((*it).isValid());
-      delete (TYPE*) (*it++);
+      delete static_cast<TYPE*>(*it++);
     }
     objects.clear();
   }
@@ -154,7 +129,7 @@ namespace EUROPA {
     object_iterator it = objects.begin();
     while(it != objects.end()){
       checkError((*it).isValid(), *it);
-      delete (TYPE*) (*it++);
+      delete static_cast<TYPE*>(*it++);
     }
     objects.clear();
   }
@@ -196,7 +171,7 @@ namespace EUROPA {
       Id<TYPE> object = *it;
       if(!object.isNoId()){
 	check_error(object.isValid());
-	delete (TYPE*) (*it++);
+	delete static_cast<TYPE*>(*it++);
       }
       else
 	++it;
@@ -211,7 +186,7 @@ namespace EUROPA {
     while(it != objects.end()){
       Id<TYPE2> item = (it++)->second;
       check_error(item.isValid());
-      delete (TYPE2*) item;
+      delete static_cast<TYPE2*>(item);
     }
     objects.clear();
   }
@@ -223,7 +198,7 @@ namespace EUROPA {
     while(it != objects.end()){
       Id<TYPE2> item = (it++)->second;
       check_error(item.isValid());
-      delete (TYPE2*) item;
+      delete static_cast<TYPE2*>(item);
     }
     objects.clear();
   }
@@ -237,30 +212,12 @@ namespace EUROPA {
     }
     objects.clear();
   }
-}
 
-#ifdef _MSC_VER 
-#  define EUROPA_runTest(test, ...) { \
-     try { \
-       unsigned int id_count = EUROPA::IdTable::size(); \
-       bool result = test( __VA_ARGS__ ); \
-       EUROPA::IdTable::checkResult(result,id_count); \
-     } \
-       catch ( Error err ){ \
-       err.print( std::cout ); \
-     } \
-   }
-#else
-#  define EUROPA_runTest(test, args...) { \
-     try { \
-       unsigned int id_count = EUROPA::IdTable::size(); \
-       bool result = test(args); \
-       EUROPA::IdTable::checkResult(result,id_count); \
-     } \
-       catch (Error err){ \
-       err.print(std::cout); \
-     } \
-   }
-#endif //_MSC_VER
+template <typename Iterator>
+void cleanup(Iterator start, Iterator end) {
+  for(; start != end; ++start)
+    delete *start;
+}
+}
 
 #endif

@@ -28,7 +28,7 @@ namespace EUROPA {
 	   * @param dt Indicate the type to use as a specialization of enumeration types
 	   * @see Domain::isDynamic()
 	   */
-	  EnumeratedDomain(const DataTypeId& dt);
+	  EnumeratedDomain(const DataTypeId dt);
 
 	  /**
 	   * @brief Constructor.
@@ -36,21 +36,21 @@ namespace EUROPA {
 	   * @param values The initial set of values to populate the domain.
 	   * @see Domain::isDynamic()
 	   */
-	  EnumeratedDomain(const DataTypeId& dt, const std::list<edouble>& values);
+	  EnumeratedDomain(const DataTypeId dt, const std::list<edouble>& values);
 
 	  /**
 	   * @brief Constructor.
 	   * @param dt Indicate the type to use as a specialization of enumeration types
 	   * @param value Constructs a singleton domain. Closed on construction.
 	   */
-	  EnumeratedDomain(const DataTypeId& dt, edouble value);
+	  EnumeratedDomain(const DataTypeId dt, edouble value);
 
 	  /**
 	   * @brief Constructor.
 	   * @param dt Indicate the type to use as a specialization of enumeration types
 	   * @param value Constructs a singleton domain. Closed on construction.
 	   */
-	  EnumeratedDomain(const DataTypeId& dt, double value);
+	  EnumeratedDomain(const DataTypeId dt, double value);
 
 	  /**
 	   * @brief Copy constructor.
@@ -105,7 +105,7 @@ namespace EUROPA {
 
 	  /**
 	   * @brief Remove the given element form the domain.
-	   * @param value. The value to be removed. If present, removal will generate a value removal event
+	   * @param value The value to be removed. If present, removal will generate a value removal event
 	   * @see DomainListener::VALUE_REMOVED
 	   */
 	  void remove(edouble value);
@@ -127,14 +127,14 @@ namespace EUROPA {
 
 	  /**
 	   * @brief Indicates assigment to the target domain as a relaxation triggered internally.
-	   * @param value the target singleton value.
+	   * @param dom The target domain
 	   * @see relax
 	   */
 	  void relax(const Domain& dom);
 
 	  /**
 	   * @brief Indicates relaxation to a singleton value. Occurs when domain has been emptied previously
-	   * @param The value to relax to
+	   * @param value The value to relax to
 	   */
 	  void relax(edouble value);
 
@@ -143,7 +143,7 @@ namespace EUROPA {
 	   *
 	   * This method is provided as a more efficient way to handle the common operation of equating 2 EnumeratedDomain domains.
 	   * Tackling changes to both domains at once allows us to take advantage of the sorted order of the domains.
-	   * @param The domain to be equated with this object. It may change.
+	   * @param dom The domain to be equated with this object. It may change.
 	   * @return true if a change to either domain has occurred.
 	   * @see DomainListener::EMPTIED, DomainListener::SET_TO_SINGLETON, DomainListener::VALUE_REMOVED
 	   */
@@ -258,7 +258,7 @@ namespace EUROPA {
 	  /**
 	   * @brief test if the intersection between this domain and the given domain is empty
 	   * @param dom the domain tested against.
-	   * @param true if any elements of this domain are in dom. Otherwise false.
+	   * @return true if any elements of this domain are in dom. Otherwise false.
 	   */
 	  bool intersects(const Domain& dom) const;
 
@@ -281,7 +281,7 @@ namespace EUROPA {
 	   * @note Will be compiled out for fast version.
 	   * @note No-op for enumerations.
 	   */
-	  virtual void testPrecision(const edouble& value) const {}
+    virtual void testPrecision(const edouble& value) const;
 
 	  /**
 	   * @brief Implements equate where both are closed enumerations
@@ -299,7 +299,7 @@ namespace EUROPA {
    *
    * @todo Possible additions: support for open ended intervals and multiple intervals,
    * preferably as new classes rather than impacting the performance of this class.
-   * --wedgingt@email.arc.nasa.gov 2004 Feb 26
+   * --wedgingt 2004 Feb 26
    */
   class IntervalDomain : public Domain {
   public:
@@ -309,11 +309,11 @@ namespace EUROPA {
      */
     void operator>>(ostream& os) const;
 
-    IntervalDomain(const DataTypeId& dt = FloatDT::instance());
-    IntervalDomain(edouble lb, edouble ub, const DataTypeId& dt = FloatDT::instance());
-    IntervalDomain(double lb, double ub, const DataTypeId& dt = FloatDT::instance());
-    IntervalDomain(edouble value, const DataTypeId& dt = FloatDT::instance());
-    IntervalDomain(double value, const DataTypeId& dt = FloatDT::instance());
+    IntervalDomain(const DataTypeId dt = FloatDT::instance());
+    IntervalDomain(edouble lb, edouble ub, const DataTypeId dt = FloatDT::instance());
+    IntervalDomain(double lb, double ub, const DataTypeId dt = FloatDT::instance());
+    IntervalDomain(edouble value, const DataTypeId dt = FloatDT::instance());
+    IntervalDomain(double value, const DataTypeId dt = FloatDT::instance());
     IntervalDomain(const Domain& org);
 
     /**
@@ -360,7 +360,7 @@ namespace EUROPA {
 
     /**
      * @brief Indicates assigment to the target domain as a relaxation triggered externally.
-     * @param value the target singleton value.
+     * @param dom the target singleton domain.
      * @see relax
      */
     void reset(const Domain& dom);
@@ -437,7 +437,7 @@ namespace EUROPA {
 
     /**
      * @brief Remove the given element form the domain.
-     * @param value. The value to be removed.
+     * @param value The value to be removed.
      * @note If the value was in the domain, this call will generate a
      * value removal event.
      * @note An error for real intervals unless not in the set or was
@@ -491,14 +491,14 @@ namespace EUROPA {
     /**
      * @brief Test if this domain is a subset of dom.
      * @param dom the domain tested against.
-     * @param true if all elements of this domain are in dom, otherwise false.
+     * @return true if all elements of this domain are in dom, otherwise false.
      */
     bool isSubsetOf(const Domain& dom) const;
 
     /**
      * @brief Test if the intersection between this domain and the given domain is empty.
      * @param dom the domain tested against.
-     * @param true if any elements of this domain are in dom, otherwise false.
+     * @return true if any elements of this domain are in dom, otherwise false.
      */
     bool intersects(const Domain& dom) const;
 
@@ -568,12 +568,13 @@ namespace EUROPA {
   class StringDomain : public EnumeratedDomain {
   public:
 
-    StringDomain(const DataTypeId& dt = StringDT::instance());
-    StringDomain(edouble value, const DataTypeId& dt = StringDT::instance());
-    StringDomain(double value, const DataTypeId& dt = StringDT::instance());
-    StringDomain(const std::string& value, const DataTypeId& dt = StringDT::instance());
-    StringDomain(const std::list<edouble>& values, const DataTypeId& dt = StringDT::instance());
-    StringDomain(const std::list<LabelStr>& values, const DataTypeId& dt = StringDT::instance());
+    StringDomain(const DataTypeId dt = StringDT::instance());
+    StringDomain(edouble value, const DataTypeId dt = StringDT::instance());
+    StringDomain(double value, const DataTypeId dt = StringDT::instance());
+    StringDomain(const LabelStr& value, const DataTypeId dt = StringDT::instance());
+    StringDomain(const std::string& value, const DataTypeId dt = StringDT::instance());
+    StringDomain(const std::list<edouble>& values, const DataTypeId dt = StringDT::instance());
+    StringDomain(const std::list<LabelStr>& values, const DataTypeId dt = StringDT::instance());
     StringDomain(const Domain& org);
 
     virtual StringDomain *copy() const;
@@ -583,14 +584,19 @@ namespace EUROPA {
      * @param value The value to set. Must be a LabelStr.
      */
     void set(edouble value);
-
     bool isMember(edouble value) const;
 
     /** String specific bindings for user convenience **/
     void set(const std::string& value);
+    void set(const LabelStr& value);
     bool isMember(const std::string& value) const;
+    bool isMember(const LabelStr& value) const;
+    bool isMember(const char* value) const {return isMember(LabelStr(value));}
     void insert(const std::string& value);
+    void insert(const LabelStr& value);
+    void insert(const char* value) {insert(LabelStr(value));}
     void insert(edouble value);
+    void insert(const std::list<edouble>& values) {EnumeratedDomain::insert(values);}
   };
 
   /**
@@ -599,10 +605,10 @@ namespace EUROPA {
    */
   class SymbolDomain : public EnumeratedDomain {
   public:
-    SymbolDomain(const DataTypeId& dt = SymbolDT::instance());
-    SymbolDomain(edouble value,const DataTypeId& dt = SymbolDT::instance());
-    SymbolDomain(double value,const DataTypeId& dt = SymbolDT::instance());
-    SymbolDomain(const std::list<edouble>& values,const DataTypeId& dt = SymbolDT::instance());
+    SymbolDomain(const DataTypeId dt = SymbolDT::instance());
+    SymbolDomain(edouble value,const DataTypeId dt = SymbolDT::instance());
+    SymbolDomain(double value,const DataTypeId dt = SymbolDT::instance());
+    SymbolDomain(const std::list<edouble>& values,const DataTypeId dt = SymbolDT::instance());
     SymbolDomain(const Domain& org);
 
     virtual SymbolDomain *copy() const;
@@ -611,10 +617,10 @@ namespace EUROPA {
   class NumericDomain : public EnumeratedDomain {
   public:
 
-    NumericDomain(const DataTypeId& dt = FloatDT::instance());
-    NumericDomain(edouble value, const DataTypeId& dt = FloatDT::instance());
-    NumericDomain(double value, const DataTypeId& dt = FloatDT::instance());
-    NumericDomain(const std::list<edouble>& values, const DataTypeId& dt = FloatDT::instance());
+    NumericDomain(const DataTypeId dt = FloatDT::instance());
+    NumericDomain(edouble value, const DataTypeId dt = FloatDT::instance());
+    NumericDomain(double value, const DataTypeId dt = FloatDT::instance());
+    NumericDomain(const std::list<edouble>& values, const DataTypeId dt = FloatDT::instance());
     NumericDomain(const Domain& org);
 
     virtual NumericDomain *copy() const;
@@ -633,11 +639,11 @@ namespace EUROPA {
   class IntervalIntDomain: public IntervalDomain {
   public:
 
-    IntervalIntDomain(const DataTypeId& dt = IntDT::instance());
-    IntervalIntDomain(eint lb, eint ub, const DataTypeId& dt = IntDT::instance());
-    IntervalIntDomain(eint::basis_type lb, eint::basis_type ub, const DataTypeId& dt = IntDT::instance());
-    IntervalIntDomain(eint value, const DataTypeId& dt = IntDT::instance());
-    IntervalIntDomain(eint::basis_type value, const DataTypeId& dt = IntDT::instance());
+    IntervalIntDomain(const DataTypeId dt = IntDT::instance());
+    IntervalIntDomain(eint lb, eint ub, const DataTypeId dt = IntDT::instance());
+    IntervalIntDomain(eint::basis_type lb, eint::basis_type ub, const DataTypeId dt = IntDT::instance());
+    IntervalIntDomain(eint value, const DataTypeId dt = IntDT::instance());
+    IntervalIntDomain(eint::basis_type value, const DataTypeId dt = IntDT::instance());
     IntervalIntDomain(const Domain& org);
 
     virtual ~IntervalIntDomain();
@@ -704,8 +710,8 @@ namespace EUROPA {
   class BoolDomain : public IntervalIntDomain {
   public:
 
-    BoolDomain(const DataTypeId& dt = BoolDT::instance());
-    BoolDomain(bool value, const DataTypeId& dt = BoolDT::instance());
+    BoolDomain(const DataTypeId dt = BoolDT::instance());
+    BoolDomain(bool value, const DataTypeId dt = BoolDT::instance());
     BoolDomain(const Domain& org);
 
     bool isFinite() const;

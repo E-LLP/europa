@@ -5,14 +5,16 @@
 #include "Solver.hh"
 
 namespace EUROPA {
-  namespace SOLVERS {
-    DecisionPoint::DecisionPoint(const DbClientId& client, eint entityKey, const LabelStr& explanation) 
+namespace SOLVERS {
+DecisionPoint::DecisionPoint(const DbClientId client, eint entityKey,
+                             const std::string& explanation) 
       : Entity(), m_client(client),  m_entityKey(entityKey), m_id(this), 
-	m_explanation(explanation), m_isExecuted(false), m_initialized(false), m_maxChoices(0), m_counter(0) {}
+	m_explanation(explanation), m_isExecuted(false), m_initialized(false),
+        m_context(), m_maxChoices(0), m_counter(0) {}
 
     DecisionPoint::~DecisionPoint() {m_id.remove();}
 
-    const DecisionPointId& DecisionPoint::getId() const {return m_id;}
+    const DecisionPointId DecisionPoint::getId() const {return m_id;}
 
     void DecisionPoint::initialize(){
       if(!m_initialized){
@@ -52,5 +54,7 @@ namespace EUROPA {
     bool DecisionPoint::isInitialized() const {
       return m_initialized;
     }
-  }
+
+bool DecisionPoint::customStaticMatch(const EntityId) {return true;}
+}
 }
